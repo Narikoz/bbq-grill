@@ -1,0 +1,101 @@
+name: bbq-grill
+
+services:
+
+  # ─── MariaDB 11.3 ───────────────────────────────────────────
+  db:
+    image: mariadb:11.3
+    container_name: bbq_db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
+      MARIADB_DATABASE:      ${DB_NAME:-bbq_queue_db}
+      MARIADB_USER:          ${DB_USER:-bbq_user}
+      MARIADB_PASSWORD:      ${DB_PASSWORD:-bbq_pass}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [bbq_net]
+
+  # ─── PHP 8.2 + Apache ───────────────────────────────────────
+  api:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: bbq_api
+    restart: unless-stopped
+    environment:
+      DB_HOST:     db
+      DB_PORT:     3306
+      DB_NAME:     ${DB_NAME:-bbq_queue_db}
+      DB_USER:     ${DB_USER:-bbq_user}
+      DB_PASSWORD: ${DB_PASSWORD:-bbq_pass}
+      APP_ENV:     ${APP_ENV:-development}
+    volumes:
+      - ./bbq_api:/var/www/html/api:cached
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [bbq_net]
+
+  # ─── Angular 19 dev server (Vite + Tailwind v4 Oxide) ───────
+  angular:
+    image: node:22-alpine
+    container_name: bbq_angular
+    working_dir: /app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: "--max-old-space-size=4096"
+    volumes:
+      - ./bbq_angular:/app:cached
+      - ng_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install --prefer-offline --no-audit --no-fund &&
+        npx ng serve --host 0.0.0.0 --port 4200 --disable-host-check
+      "
+    networks: [bbq_net]
+
+  # ─── Nginx reverse proxy ────────────────────────────────────
+  # http://localhost     → Angular SPA
+  # http://localhost/api → PHP REST API
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: bbq_nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [api, angular]
+    networks: [bbq_net]
+
+  # ─── phpMyAdmin ───────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: bbq_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: bbq_user
+      PMA_PASSWORD: bbq_pass_CHANGE_ME
+    networks: [bbq_net]
+
+volumes:
+  db_data:
+  ng_modules:
+
+networks:
+  bbq_net:
+    driver: bridge

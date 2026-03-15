@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "angular.ng-template",
+    "bradlc.vscode-tailwindcss",
+    "dbaeumer.vscode-eslint",
+    "ms-azuretools.vscode-docker",
+    "PKief.material-icon-theme",
+    "eamodio.gitlens",
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "mikestead.dotenv",
+    "redhat.vscode-yaml",
+    "cweijan.vscode-database-client2"
+  ]
+}

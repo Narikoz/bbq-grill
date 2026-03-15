@@ -1,0 +1,7 @@
+.env
+bbq_angular/node_modules/
+bbq_angular/dist/
+bbq_angular/.angular/
+**/*.log
+.DS_Store
+Thumbs.db

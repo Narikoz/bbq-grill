@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════
+   THERMAL NOIR — Design System
+   Bebas Neue (display) · Bricolage Grotesque (body) · JetBrains Mono (data)
+   Single accent: Lava #FF5722
+   Heat-encoded queue urgency
+═══════════════════════════════════════════════ */
+
+:root {
+  /* Background layers */
+  --color-coal:    #050608;
+  --color-forge:   #0C0E18;
+  --color-cinder:  #121520;
+  --color-smolder: #1A1D2E;
+  --color-ember:   #222640;
+
+  /* Text */
+  --color-ash:     #E8ECF5;
+  --color-smoke:   #8B95A8;
+  --color-haze:    #4A5468;
+
+  /* The ONE accent */
+  --color-lava:       #FF5722;
+  --color-lava-light: #FF8A65;
+  --color-lava-dark:  #BF360C;
+
+  /* Semantic */
+  --color-jade:    #10B981;
+  --color-azure:   #3B82F6;
+  --color-amber:   #F59E0B;
+  --color-crimson: #EF4444;
+
+  /* Heat states (queue urgency) */
+  --color-heat-0:  rgba(74, 84, 104, 0.20);   /* < 5min   neutral */
+  --color-heat-1:  rgba(245, 158, 11, 0.25);  /* 5-15min  warm */
+  --color-heat-2:  rgba(255, 87, 34, 0.30);   /* 15-30min hot */
+  --color-heat-3:  rgba(239, 68, 68, 0.40);   /* 30+ min  critical */
+
+  /* Fonts */
+  --font-display: 'Bebas Neue', 'Impact', sans-serif;
+  --font-sans:    'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+}
+
+/* ─── Base ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-coal);
+  color: var(--color-ash);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* Atmospheric mesh */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 90vw 55vh at 5% 0%,   rgba(255,87,34,.07)   0%, transparent 55%),
+    radial-gradient(ellipse 60vw 40vh at 95% 0%,  rgba(255,87,34,.04)   0%, transparent 50%),
+    radial-gradient(ellipse 80vw 50vh at 50% 100%,rgba(16,185,129,.04)  0%, transparent 55%);
+}
+
+/* Grain */
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  opacity: .04;
+}
+
+/* ─── Typography ─────────────────────────────── */
+.font-display { font-family: var(--font-display) !important; letter-spacing: .04em; }
+.font-mono    { font-family: var(--font-mono) !important; }
+
+/* ─── Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-ember); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-smolder); }
+
+/* ─── Focus ring ─────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-lava);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Animations ─────────────────────────────── */
+@keyframes thermal-in {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes heat-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+  50%     { box-shadow: 0 0 0 6px rgba(239,68,68,.0); }
+}
+@keyframes flip-in {
+  0%   { transform: rotateX(90deg); opacity: 0; }
+  100% { transform: rotateX(0deg);  opacity: 1; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes count-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes ember-rise {
+  0%   { transform: translateY(0)      scale(1);    opacity: 0; }
+  10%  { opacity: .8; }
+  100% { transform: translateY(-80px)  scale(.4);   opacity: 0; }
+}
+@keyframes glow-lava {
+  0%,100% { text-shadow: 0 0 20px rgba(255,87,34,.3); }
+  50%     { text-shadow: 0 0 40px rgba(255,87,34,.6); }
+}
+
+.animate-thermal-in   { animation: thermal-in .4s cubic-bezier(.22,1,.36,1) both; }
+.animate-slide-right  { animation: slide-in-right .35s ease both; }
+.animate-heat-pulse   { animation: heat-pulse 2s ease-in-out infinite; }
+.animate-spin         { animation: spin .7s linear infinite; }
+.animate-glow-lava    { animation: glow-lava 3s ease-in-out infinite; }
+.animate-flip-in      { animation: flip-in .3s ease both; perspective: 600px; }
+
+.stagger-1  { animation-delay: .05s; }
+.stagger-2  { animation-delay: .10s; }
+.stagger-3  { animation-delay: .15s; }
+.stagger-4  { animation-delay: .20s; }
+.stagger-5  { animation-delay: .25s; }
+
+/* ─── Glass surfaces ─────────────────────────── */
+.glass-card {
+  position: relative; z-index: 1;
+  background: linear-gradient(145deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.glass-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  pointer-events: none;
+}
+
+.glass-sm {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--radius-md);
+}
+
+/* ─── Spartan UI overrides for dark theme ─────── */
+.hlm-input,
+input[data-spartan] {
+  background: rgba(255,255,255,.04) !important;
+  border-color: rgba(255,255,255,.10) !important;
+  color: var(--color-ash) !important;
+  font-family: var(--font-sans) !important;
+}
+.hlm-input:focus,
+input[data-spartan]:focus {
+  border-color: rgba(255,87,34,.5) !important;
+  box-shadow: 0 0 0 3px rgba(255,87,34,.10) !important;
+}
+
+/* ─── Heat badges ─────────────────────────────── */
+.heat-cold     { border-left: 2px solid rgba(74,84,104,.5); }
+.heat-warm     { border-left: 2px solid rgba(245,158,11,.6); box-shadow: -3px 0 12px rgba(245,158,11,.10); }
+.heat-hot      { border-left: 2px solid rgba(255,87,34,.7);  box-shadow: -3px 0 18px rgba(255,87,34,.15); }
+.heat-critical { border-left: 2px solid #EF4444; box-shadow: -3px 0 25px rgba(239,68,68,.20); animation: heat-pulse 2.5s ease-in-out infinite; }
+
+/* ─── Score lines (background texture) ─────────── */
+.score-lines {
+  background-image: repeating-linear-gradient(
+    -28deg,
+    transparent,
+    transparent 64px,
+    rgba(255,255,255,.015) 64px,
+    rgba(255,255,255,.015) 65px
+  );
+}
+
+/* ─── Dividers ─────────────────────────────────── */
+.divider-lava { border-top: 1px solid rgba(255,87,34,.18); }
+
+/* ─── Number display ─────────────────────────────── */
+.num-display {
+  font-family: var(--font-display) !important;
+  letter-spacing: .04em;
+  line-height: 1;
+}

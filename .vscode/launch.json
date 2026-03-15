@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Angular (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost",
+      "webRoot": "${workspaceFolder}/bbq_angular/src",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/*"
+      }
+    }
+  ]
+}
