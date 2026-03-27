@@ -25,6 +25,10 @@ export const QueueSchema = z.object({
   is_paid:           z.boolean(),
   is_qr:             z.boolean(),
   pay_link:          z.string().nullable(),
+  pay_method:        z.enum(['CASH_DEPOSIT','QR_FULL','QR_DEPOSIT']).optional(),
+  is_deposit:        z.number().optional(),
+  deposit_amount:    z.number().optional(),
+  remaining_amount:  z.number().optional(),
   payment_id:        z.number().optional().nullable(),
   total_amount:      z.number().optional().nullable(),
   subtotal_amount:   z.number().optional().nullable(),
@@ -32,6 +36,10 @@ export const QueueSchema = z.object({
   vat_amount:        z.number().optional().nullable(),
   payment_method:    z.string().optional().nullable(),
   payment_time:      z.string().optional().nullable(),
+  buffet_ends_at:    z.string().nullable().optional(),
+  time_remaining_sec: z.number().nullable().optional(),
+  tier:              z.string().optional(),
+  price_per_person:  z.number().optional(),
 })
 export type Queue = z.infer<typeof QueueSchema>
 
@@ -91,13 +99,27 @@ export const TodayReportSchema = z.object({
 })
 export type TodayReport = z.infer<typeof TodayReportSchema>
 
+export const TimeSlotSchema = z.object({
+  slot_id:        z.number(),
+  slot_time:      z.string(),
+  max_capacity:   z.number(),
+  is_active:      z.boolean(),
+  booked_pax:     z.number().optional(),
+  remaining:      z.number().optional(),
+  is_full:        z.boolean().optional(),
+  is_nearly_full: z.boolean().optional(),
+})
+export type TimeSlot = z.infer<typeof TimeSlotSchema>
+
 // ─── Booking Form Schema ─────────────────────────────────────
 export const BookingFormSchema = z.object({
   customer_name: z.string().min(2, 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร'),
   customer_tel:  z.string().regex(/^\d{9,10}$/, 'เบอร์โทรไม่ถูกต้อง'),
   pax_amount:    z.number().min(1).max(20),
-  booking_time:  z.string(),
-  pay_method:    z.enum(['CASH','QR']),
+  slot_id:       z.number().min(1, 'กรุณาเลือกรอบเวลา'),
+  booking_date:  z.string(),
+  pay_method:    z.enum(['CASH_DEPOSIT','QR_FULL','QR_DEPOSIT']),
+  tier:          z.enum(['SILVER','GOLD','PLATINUM']).optional(),
 })
 export type BookingForm = z.infer<typeof BookingFormSchema>
 
@@ -106,11 +128,32 @@ export const PRICE_PER_PERSON = 299
 export const SERVICE_RATE     = 0.10
 export const VAT_RATE         = 0.07
 
-export function calcBreakdown(pax: number) {
-  const subtotal = pax * PRICE_PER_PERSON
+export type TierType = 'SILVER' | 'GOLD' | 'PLATINUM'
+
+export const TIER_PRICES: Record<TierType, number> = {
+  SILVER: 299, GOLD: 399, PLATINUM: 599,
+}
+
+export const TIER_LABELS: Record<TierType, { name: string; desc: string; icon: string }> = {
+  SILVER:   { name: 'Silver',   desc: 'บุฟเฟ่ต์มาตรฐาน',    icon: '🥩' },
+  GOLD:     { name: 'Gold',     desc: 'บุฟเฟ่ต์พรีเมียม',    icon: '⭐' },
+  PLATINUM: { name: 'Platinum', desc: 'บุฟเฟ่ต์สุดพรีเมียม', icon: '�' },
+}
+
+export const TIER_LIST: TierType[] = ['SILVER', 'GOLD', 'PLATINUM']
+
+export const DEPOSIT_PER_PAX = 100
+
+export function tierPrice(tier: string): number {
+  return TIER_PRICES[tier as TierType] ?? 299
+}
+
+export function calcBreakdown(pax: number, tier: string = 'SILVER') {
+  const pricePerPerson = tierPrice(tier)
+  const subtotal = pax * pricePerPerson
   const service  = Math.round(subtotal * SERVICE_RATE * 100) / 100
   const vat      = Math.round((subtotal + service) * VAT_RATE * 100) / 100
-  return { subtotal, service, vat, grand: subtotal + service + vat }
+  return { subtotal, service, vat, grand: subtotal + service + vat, pricePerPerson }
 }
 
 export function qid(id: number): string {
@@ -143,7 +186,9 @@ export function heatClass(level: 0|1|2|3): string {
 
 export function payLabel(m: string): string {
   const map: Record<string, string> = {
-    CASH: 'เงินสด', QR: 'QR PromptPay', PROMPTPAY: 'QR PromptPay', CARD: 'บัตรเครดิต/เดบิต'
+    CASH: 'เงินสด', CASH_DEPOSIT: 'เงินสด (มัดจำ QR)',
+    QR: 'QR PromptPay', QR_FULL: 'QR เต็มจำนวน', QR_DEPOSIT: 'QR มัดจำ',
+    PROMPTPAY: 'QR PromptPay', CARD: 'บัตรเครดิต/เดบิต',
   }
   return map[m] ?? m
 }

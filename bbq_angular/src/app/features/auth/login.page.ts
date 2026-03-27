@@ -13,14 +13,14 @@ import { AuthService } from '../../core/services/auth.service'
     <div class="min-h-dvh flex items-center justify-center p-6 score-lines relative">
 
       <div class="absolute inset-0 pointer-events-none"
-           style="background:radial-gradient(ellipse 70% 50% at 50% 50%, rgba(255,87,34,.08), transparent 60%)"></div>
+           style="background:radial-gradient(ellipse 70% 50% at 50% 50%, rgba(201,168,76,.07), transparent 60%)"></div>
 
       <div class="w-full max-w-[400px] relative z-10">
 
         <!-- Brand -->
         <div class="text-center mb-10 animate-thermal-in">
-          <div class="num-display text-6xl mb-3" style="color:var(--color-lava);text-shadow:0 0 40px rgba(255,87,34,.4)">🔥</div>
-          <div class="num-display text-4xl tracking-widest mb-1" style="color:var(--color-ash)">BBQ GRILL</div>
+          <div class="mb-3 animate-glow-gold" style="font-size:3.5rem;line-height:1"><span class="css-flame"></span></div>
+          <div class="font-display text-4xl tracking-widest mb-1" style="color:var(--color-ash)">BBQ GRILL</div>
           <div class="text-xs tracking-[.2em] uppercase" style="color:var(--color-haze)">Staff Portal</div>
         </div>
 
@@ -93,7 +93,7 @@ import { AuthService } from '../../core/services/auth.service'
 
             <button type="submit" [disabled]="loading()"
                     class="w-full py-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 mt-1"
-                    style="background:linear-gradient(135deg,var(--color-lava-light),var(--color-lava));color:#fff;border:none;cursor:pointer;box-shadow:0 14px 45px rgba(255,87,34,.22)"
+                    style="background:linear-gradient(135deg,var(--color-gold-light),var(--color-gold));color:#050608;border:none;cursor:pointer;box-shadow:0 14px 45px rgba(201,168,76,.25);font-family:var(--font-sans)"
                     [style.opacity]="loading() ? '.7' : '1'">
               @if (loading()) {
                 <div class="animate-spin rounded-full" style="width:16px;height:16px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff"></div>
@@ -141,7 +141,7 @@ export class LoginPage {
     const { username, password } = this.form.value
     this.auth.login(username!, password!).subscribe({
       next: () => this.router.navigate(['/staff']),
-      error: (e) => {
+      error: (e: { error?: { error?: string } }) => {
         this.error.set(e.error?.error ?? 'เข้าสู่ระบบไม่สำเร็จ')
         this.loading.set(false)
       },
@@ -150,8 +150,8 @@ export class LoginPage {
 
   f(e: FocusEvent, focused: boolean) {
     const el = e.target as HTMLElement
-    el.style.borderColor = focused ? 'rgba(255,87,34,.5)'  : 'rgba(255,255,255,.09)'
-    el.style.boxShadow   = focused ? '0 0 0 3px rgba(255,87,34,.10)' : 'none'
+    el.style.borderColor = focused ? 'rgba(201,168,76,.5)'  : 'rgba(255,255,255,.09)'
+    el.style.boxShadow   = focused ? '0 0 0 3px rgba(201,168,76,.10)' : 'none'
     el.style.background  = focused ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.04)'
   }
 }

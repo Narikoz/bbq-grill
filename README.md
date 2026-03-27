@@ -174,7 +174,53 @@ Queue cards เปลี่ยนสีตามเวลารอจริง:
 
 ---
 
-## 🚢 Deploy บน VPS
+## � MCP Servers (Model Context Protocol)
+
+ระบบนี้รองรับ MCP servers เพื่อเพิ่มความสามารถให้ AI Assistant (Cascade) ในการจัดการระบบ
+
+### MCPs ที่แนะนำสำหรับ POS System
+
+**Phase 1: Critical**
+- 🔲 **Supabase** - Database management & queries
+- 🔲 **Postman** - API testing & automation
+- 🔲 **Snyk** - Security scanning & vulnerability detection
+
+**Phase 2: Important**
+- 🔲 **Slack** - Notifications & alerts
+- 🔲 **MercadoPago/PayPal** - Payment gateway integration
+- 🔲 **SonarQube** - Code quality analysis
+
+**Phase 3: Nice to Have**
+- 🔲 **Notion/Asana** - Project management
+- 🔲 **Vercel/Netlify** - Deployment automation
+- 🔲 **Terraform** - Infrastructure as Code
+
+### เอกสาร MCP
+
+- 📖 [Installation Guide](./MCP_INSTALLATION_GUIDE.md) - วิธีติดตั้งและ config
+- 🎯 [Usage Examples](./MCP_USAGE_EXAMPLES.md) - ตัวอย่างการใช้งาน
+- ⚡ [Quick Reference](./MCP_QUICK_REFERENCE.md) - คำสั่งที่ใช้บ่อย
+- ⚙️ [Config Template](./.windsurf/mcp-config-template.json) - Template configuration
+
+### ตัวอย่างการใช้งาน
+
+```bash
+# Database Query
+"Query queues วันนี้ที่ status = 'WAITING'"
+
+# API Testing
+"Test POST /api/auth/login endpoint"
+
+# Security Scan
+"Scan package.json vulnerabilities"
+
+# Generate Report
+"สร้าง revenue report วันนี้"
+```
+
+---
+
+## �🚢 Deploy บน VPS
 
 ```bash
 # บน server (Ubuntu)

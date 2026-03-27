@@ -1,7 +1,35 @@
+# ─── Environment (secrets) ───────────────────────
 .env
+
+# ─── Dependencies ────────────────────────────────
+node_modules/
 bbq_angular/node_modules/
-bbq_angular/dist/
 bbq_angular/.angular/
-**/*.log
+
+# ─── Build output ────────────────────────────────
+bbq_angular/dist/
+
+# ─── Docker volumes (local data) ─────────────────
+docker/mysql/data/
+
+# ─── OS generated ────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# ─── IDE ─────────────────────────────────────────
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Logs ────────────────────────────────────────
+**/*.log
+npm-debug.log*
+
+# ─── Windsurf / Cascade ─────────────────────────
+.windsurf/plans/
+
+# ─── Misc ────────────────────────────────────────
+*.tmp
+*.bak

@@ -4,7 +4,7 @@ import { HttpClient, HttpParams } from '@angular/common/http'
 import { Observable } from 'rxjs'
 import {
   Queue, Table, Employee, Payment,
-  TodayReport, User, BookingForm
+  TodayReport, User, BookingForm, TimeSlot
 } from '../models'
 
 @Injectable({ providedIn: 'root' })
@@ -77,6 +77,10 @@ export class ApiService {
     )
   }
 
+  getAllPayments(queueId: number): Observable<any> {
+    return this.http.get(`${this.base}/payments/all/${queueId}`)
+  }
+
   // ── Employees ──────────────────────────────────────────────
   getEmployees(): Observable<{ employees: Employee[] }> {
     return this.http.get<{ employees: Employee[] }>(
@@ -95,11 +99,51 @@ export class ApiService {
       { withCredentials: true }
     )
   }
+  updateEmployeeFull(id: number, data: { emp_name: string; role: string }) {
+    return this.http.put<{ ok: boolean }>(
+      `${this.base}/employees/${id}`, data, { withCredentials: true }
+    )
+  }
+  deleteEmployee(id: number) {
+    return this.http.delete<{ ok: boolean }>(
+      `${this.base}/employees/${id}`, { withCredentials: true }
+    )
+  }
+
+  // ── Time Slots ────────────────────────────────────────────
+  getSlots(date = ''): Observable<{ slots: TimeSlot[] }> {
+    let params = new HttpParams()
+    if (date) params = params.set('date', date)
+    return this.http.get<{ slots: TimeSlot[] }>(
+      `${this.base}/slots`, { params, withCredentials: true }
+    )
+  }
+
+  createSlot(data: { slot_time: string; max_capacity: number }): Observable<{ ok: boolean; slot_id: number }> {
+    return this.http.post<{ ok: boolean; slot_id: number }>(
+      `${this.base}/slots`, data, { withCredentials: true }
+    )
+  }
+
+  updateSlot(id: number, data: { max_capacity?: number; is_active?: number; slot_time?: string }) {
+    return this.http.patch<{ ok: boolean }>(
+      `${this.base}/slots/${id}`, data, { withCredentials: true }
+    )
+  }
 
   // ── Reports ────────────────────────────────────────────────
   getTodayReport(): Observable<TodayReport> {
     return this.http.get<TodayReport>(
       `${this.base}/reports/today`, { withCredentials: true }
     )
+  }
+
+  // ── Customers ─────────────────────────────────────────────
+  getCustomers(): Observable<any> {
+    return this.http.get(`${this.base}/customers`, { withCredentials: true })
+  }
+
+  getCustomerHistory(id: number): Observable<any> {
+    return this.http.get(`${this.base}/customers/${id}/history`, { withCredentials: true })
   }
 }

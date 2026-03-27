@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-supabase"],
+      "env": {
+        "SUPABASE_URL": "http://localhost:3306",
+        "SUPABASE_KEY": "YOUR_SUPABASE_KEY"
+      },
+      "disabled": true
+    },
+    "postman": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postman"],
+      "env": {
+        "POSTMAN_API_KEY": "YOUR_POSTMAN_API_KEY"
+      },
+      "disabled": false
+    },
+    "snyk": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-snyk"],
+      "env": {
+        "SNYK_TOKEN": "YOUR_SNYK_TOKEN"
+      },
+      "disabled": false
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "YOUR_SLACK_BOT_TOKEN",
+        "SLACK_TEAM_ID": "YOUR_SLACK_TEAM_ID"
+      },
+      "disabled": false
+    },
+      "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
+      },
+      "disabled": false
+    }
+  }
+}

@@ -26,11 +26,22 @@ CREATE TABLE IF NOT EXISTS tables (
     UNIQUE KEY uk_table_number (table_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ── Time Slots ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS time_slots (
+    slot_id      INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    slot_time    TIME         NOT NULL,
+    max_capacity INT UNSIGNED NOT NULL DEFAULT 30,
+    is_active    TINYINT(1)   NOT NULL DEFAULT 1,
+    PRIMARY KEY (slot_id),
+    UNIQUE KEY uk_slot_time (slot_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ── Queues ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS queues (
     queue_id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id       INT UNSIGNED NOT NULL,
     table_id          INT UNSIGNED          DEFAULT NULL,
+    slot_id           INT UNSIGNED          DEFAULT NULL,
     pax_amount        INT UNSIGNED NOT NULL DEFAULT 1,
     booking_time      DATETIME     NOT NULL,
     queue_status      ENUM('WAITING','CONFIRMED','SEATED','FINISHED','CANCELLED')
@@ -46,10 +57,13 @@ CREATE TABLE IF NOT EXISTS queues (
     KEY idx_status      (queue_status),
     KEY idx_created     (created_at),
     KEY idx_customer    (customer_id),
+    KEY idx_slot        (slot_id),
     CONSTRAINT fk_queue_customer FOREIGN KEY (customer_id)
         REFERENCES customers (customer_id) ON DELETE RESTRICT,
     CONSTRAINT fk_queue_table FOREIGN KEY (table_id)
-        REFERENCES tables (table_id) ON DELETE SET NULL
+        REFERENCES tables (table_id) ON DELETE SET NULL,
+    CONSTRAINT fk_queue_slot FOREIGN KEY (slot_id)
+        REFERENCES time_slots (slot_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Payments ─────────────────────────────────────────────────
@@ -91,6 +105,16 @@ INSERT IGNORE INTO tables (table_number, capacity) VALUES
     (1, 2),(2, 2),(3, 4),(4, 4),(5, 4),
     (6, 4),(7, 6),(8, 6),(9, 8),(10, 10);
 
+-- Time slots (7 rounds, 30 seats each)
+INSERT IGNORE INTO time_slots (slot_time, max_capacity, is_active) VALUES
+    ('11:00', 30, 1),
+    ('12:00', 30, 1),
+    ('13:00', 30, 1),
+    ('17:00', 30, 1),
+    ('18:00', 30, 1),
+    ('19:00', 30, 1),
+    ('20:00', 30, 1);
+
 -- Default admin account  (password: admin1234)
 -- Hash generated with:  php -r "echo password_hash('admin1234', PASSWORD_DEFAULT);"
 INSERT IGNORE INTO employees (emp_name, username, password_hash, role) VALUES
@@ -111,3 +135,10 @@ INSERT IGNORE INTO employees (emp_name, username, password_hash, role) VALUES
 -- ═══════════════════════════════════════════════════════════
 GRANT ALL PRIVILEGES ON bbq_queue_db.* TO 'bbq_user'@'%';
 FLUSH PRIVILEGES;
+
+-- ── Migrations (safe for existing databases) ─────────────────
+ALTER TABLE queues ADD COLUMN IF NOT EXISTS
+    slot_id INT UNSIGNED DEFAULT NULL AFTER pax_amount;
+
+ALTER TABLE queues ADD COLUMN IF NOT EXISTS
+    tier VARCHAR(20) NOT NULL DEFAULT 'STANDARD' AFTER pax_amount;

@@ -5,6 +5,11 @@ import { authGuard, adminGuard } from './core/guards/auth.guard'
 export const routes: Routes = [
   {
     path: '',
+    loadComponent: () => import('./features/landing/landing.page')
+      .then(m => m.LandingPage)
+  },
+  {
+    path: 'booking',
     loadComponent: () => import('./features/booking/booking.page')
       .then(m => m.BookingPage)
   },
@@ -34,6 +39,11 @@ export const routes: Routes = [
     path: 'receipt/:id',
     loadComponent: () => import('./features/receipt/receipt.page')
       .then(m => m.ReceiptPage)
+  },
+  {
+    path: 'queue-status/:id',
+    loadComponent: () => import('./features/queue-status/queue-status.page')
+      .then(m => m.QueueStatusPage)
   },
   { path: '**', redirectTo: '' },
 ]

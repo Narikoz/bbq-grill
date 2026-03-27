@@ -1,49 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Kanit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════
-   THERMAL NOIR — Design System
-   Bebas Neue (display) · Bricolage Grotesque (body) · JetBrains Mono (data)
-   Single accent: Lava #FF5722
-   Heat-encoded queue urgency
+   OBSIDIAN EMBER — Design System
+   Cormorant Garamond (display) · Kanit (UI) · JetBrains Mono (data)
+   Gold accent #C9A84C · Ember #FF4500 · luxury POS
 ═══════════════════════════════════════════════ */
 
 :root {
   /* Background layers */
   --color-coal:    #050608;
-  --color-forge:   #0C0E18;
-  --color-cinder:  #121520;
-  --color-smolder: #1A1D2E;
-  --color-ember:   #222640;
+  --color-forge:   #0f0f11;
+  --color-cinder:  #0f0f11;
+  --color-smolder: #16161a;
+  --color-ember:   #1e1e24;
 
   /* Text */
-  --color-ash:     #E8ECF5;
-  --color-smoke:   #8B95A8;
-  --color-haze:    #4A5468;
+  --color-ash:     #F5F0E8;
+  --color-smoke:   #6B7280;
+  --color-haze:    #3d3d4a;
 
-  /* The ONE accent */
-  --color-lava:       #FF5722;
-  --color-lava-light: #FF8A65;
-  --color-lava-dark:  #BF360C;
+  /* Gold — primary accent */
+  --color-gold:       #C9A84C;
+  --color-gold-light: #E8C96A;
+  --color-gold-dark:  #8B6914;
+
+  /* Ember — urgency / fire */
+  --color-lava:       #FF4500;
+  --color-lava-light: #FF6B35;
+  --color-lava-dark:  #C23200;
 
   /* Semantic */
   --color-jade:    #10B981;
-  --color-azure:   #3B82F6;
+  --color-azure:   #38BDF8;
   --color-amber:   #F59E0B;
   --color-crimson: #EF4444;
 
   /* Heat states (queue urgency) */
-  --color-heat-0:  rgba(74, 84, 104, 0.20);   /* < 5min   neutral */
-  --color-heat-1:  rgba(245, 158, 11, 0.25);  /* 5-15min  warm */
-  --color-heat-2:  rgba(255, 87, 34, 0.30);   /* 15-30min hot */
-  --color-heat-3:  rgba(239, 68, 68, 0.40);   /* 30+ min  critical */
+  --color-heat-0:  rgba(56, 189, 248, 0.15);  /* < 15min  ice blue */
+  --color-heat-1:  rgba(245, 158, 11, 0.20);  /* 15-30min amber */
+  --color-heat-2:  rgba(255, 69,  0,  0.28);  /* 30+ min  ember red */
+  --color-heat-3:  rgba(239, 68,  68, 0.38);  /* critical */
 
-  /* Fonts */
-  --font-display: 'Bebas Neue', 'Impact', sans-serif;
-  --font-sans:    'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  /* Fonts — Obsidian Ember */
+  --font-display: 'Cormorant Garamond', 'Georgia', serif;
+  --font-sans:    'Kanit', 'Segoe UI', sans-serif;
   --font-mono:    'JetBrains Mono', 'Courier New', monospace;
 
   /* Radii */
@@ -52,6 +56,10 @@
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-xl: 24px;
+
+  /* Shadows */
+  --shadow-gold:  0 0 24px rgba(201, 168, 76, 0.30);
+  --shadow-ember: 0 0 24px rgba(255, 69, 0, 0.35);
 }
 
 /* ─── Base ─────────────────────────────────── */
@@ -87,8 +95,9 @@ body::after {
 }
 
 /* ─── Typography ─────────────────────────────── */
-.font-display { font-family: var(--font-display) !important; letter-spacing: .04em; }
+.font-display { font-family: var(--font-display) !important; font-weight: 300; letter-spacing: .06em; }
 .font-mono    { font-family: var(--font-mono) !important; }
+.font-ui      { font-family: var(--font-sans) !important; }
 
 /* ─── Scrollbar ─────────────────────────────── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
@@ -131,8 +140,40 @@ body::after {
   100% { transform: translateY(-80px)  scale(.4);   opacity: 0; }
 }
 @keyframes glow-lava {
-  0%,100% { text-shadow: 0 0 20px rgba(255,87,34,.3); }
-  50%     { text-shadow: 0 0 40px rgba(255,87,34,.6); }
+  0%,100% { text-shadow: 0 0 20px rgba(255,69,0,.3); }
+  50%     { text-shadow: 0 0 40px rgba(255,69,0,.6); }
+}
+@keyframes glow-gold {
+  0%,100% { text-shadow: 0 0 20px rgba(201,168,76,.3); box-shadow: 0 0 20px rgba(201,168,76,.20); }
+  50%     { text-shadow: 0 0 40px rgba(201,168,76,.6); box-shadow: 0 0 40px rgba(201,168,76,.35); }
+}
+@keyframes ripple-out {
+  0%   { transform: scale(0); opacity: .5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+@keyframes count-up-in {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes draw-line {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes word-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes magnetic-back {
+  from { transform: translate(var(--mx,0px), var(--my,0px)); }
+  to   { transform: translate(0,0); }
+}
+@keyframes pulse-fab {
+  0%,100% { box-shadow: 0 0 0 0   rgba(201,168,76,.6); }
+  50%     { box-shadow: 0 0 0 14px rgba(201,168,76,.0); }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
 }
 
 .animate-thermal-in   { animation: thermal-in .4s cubic-bezier(.22,1,.36,1) both; }
@@ -140,6 +181,9 @@ body::after {
 .animate-heat-pulse   { animation: heat-pulse 2s ease-in-out infinite; }
 .animate-spin         { animation: spin .7s linear infinite; }
 .animate-glow-lava    { animation: glow-lava 3s ease-in-out infinite; }
+.animate-glow-gold    { animation: glow-gold 3s ease-in-out infinite; }
+.animate-word-in      { animation: word-in .5s cubic-bezier(.22,1,.36,1) both; }
+.animate-pulse-fab    { animation: pulse-fab 2s ease-in-out infinite; }
 .animate-flip-in      { animation: flip-in .3s ease both; perspective: 600px; }
 
 .stagger-1  { animation-delay: .05s; }
@@ -204,9 +248,86 @@ input[data-spartan]:focus {
 /* ─── Dividers ─────────────────────────────────── */
 .divider-lava { border-top: 1px solid rgba(255,87,34,.18); }
 
+/* ─── CSS Animated Flame ─────────────────────────── */
+@keyframes flame-flicker {
+  0%,100% { transform: scaleX(1)    scaleY(1)    rotate(-1deg); }
+  25%     { transform: scaleX(.94)  scaleY(1.06) rotate(1.5deg); }
+  50%     { transform: scaleX(1.04) scaleY(.97)  rotate(-.5deg); }
+  75%     { transform: scaleX(.97)  scaleY(1.03) rotate(1deg); }
+}
+@keyframes flame-inner {
+  0%,100% { transform: scaleX(1)    scaleY(1)    rotate(1deg); }
+  33%     { transform: scaleX(.9)   scaleY(1.08) rotate(-2deg); }
+  66%     { transform: scaleX(1.06) scaleY(.94)  rotate(.5deg); }
+}
+.css-flame {
+  display: inline-block;
+  position: relative;
+  width: .65em;
+  height: .9em;
+  background: linear-gradient(180deg, #FFD700 0%, #FF8C00 45%, #FF4500 100%);
+  border-radius: 50% 50% 25% 25% / 55% 55% 45% 45%;
+  animation: flame-flicker .8s ease-in-out infinite;
+  filter: drop-shadow(0 0 .15em rgba(255,69,0,.9)) drop-shadow(0 0 .35em rgba(255,140,0,.5));
+  transform-origin: bottom center;
+  vertical-align: middle;
+}
+.css-flame::before {
+  content: '';
+  position: absolute;
+  bottom: 8%; left: 12%;
+  width: 50%; height: 70%;
+  background: linear-gradient(180deg, #FFD700 0%, #FF8C00 100%);
+  border-radius: 50% 50% 25% 25% / 60% 60% 40% 40%;
+  animation: flame-inner .6s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.css-flame::after {
+  content: '';
+  position: absolute;
+  bottom: 22%; left: 30%;
+  width: 30%; height: 38%;
+  background: #FFD700;
+  border-radius: 50%;
+  opacity: .85;
+}
+
 /* ─── Number display ─────────────────────────────── */
 .num-display {
-  font-family: var(--font-display) !important;
-  letter-spacing: .04em;
+  font-family: 'Kanit', var(--font-sans) !important;
+  font-weight: 400;
+  letter-spacing: .02em;
   line-height: 1;
 }
+
+/* ─── Gold CTA Button ─────────────────────────────── */
+.btn-gold {
+  background: linear-gradient(135deg, var(--color-gold-light), var(--color-gold));
+  color: #050608;
+  border: none;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: opacity .2s, transform .15s;
+}
+.btn-gold:hover  { opacity: .9; transform: translateY(-1px); }
+.btn-gold:active { transform: translateY(0); }
+
+/* ─── Ripple container ──────────────────────────── */
+.ripple-host { position: relative; overflow: hidden; }
+.ripple-host .ripple {
+  position: absolute; border-radius: 50%;
+  width: 40px; height: 40px; margin: -20px;
+  background: rgba(255,255,255,.25);
+  animation: ripple-out .6s ease-out forwards;
+  pointer-events: none;
+}
+
+/* ─── Heat badges (updated for Obsidian Ember) ───── */
+.heat-cold     { border-left: 2px solid rgba(56,189,248,.5); }
+.heat-warm     { border-left: 2px solid rgba(245,158,11,.6); box-shadow: -3px 0 12px rgba(245,158,11,.12); }
+.heat-hot      { border-left: 2px solid rgba(255,69,0,.7);   box-shadow: -3px 0 18px rgba(255,69,0,.18); }
+.heat-critical { border-left: 2px solid #EF4444; box-shadow: -3px 0 25px rgba(239,68,68,.22); animation: heat-pulse 2.5s ease-in-out infinite; }

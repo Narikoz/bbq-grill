@@ -4,14 +4,14 @@ import {
   ChangeDetectionStrategy, OnDestroy,
 } from '@angular/core'
 import { CommonModule } from '@angular/common'
-import { RouterLink } from '@angular/router'
+import { Router, RouterLink } from '@angular/router'
 import { FormsModule } from '@angular/forms'
 import {
   injectQuery, injectMutation, injectQueryClient,
 } from '@tanstack/angular-query-experimental'
 import { ApiService } from '../../core/services/api.service'
 import { AuthService } from '../../core/services/auth.service'
-import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '../../core/models'
+import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass, TIER_LABELS, TierType } from '../../core/models'
 
 @Component({
   selector: 'app-staff-page',
@@ -25,22 +25,22 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
       <aside class="w-[200px] shrink-0 flex flex-col border-r"
              style="background:var(--color-forge);border-color:rgba(255,255,255,.06)">
         <div class="p-5 border-b" style="border-color:rgba(255,255,255,.06)">
-          <div class="num-display text-xl" style="color:var(--color-ash)">BBQ GRILL</div>
-          <div class="text-[10px] tracking-widest uppercase mt-0.5" style="color:rgba(255,87,34,.7)">QUEUE SYSTEM</div>
+          <div class="font-display text-2xl tracking-widest" style="color:var(--color-gold)">BBQ GRILL</div>
+          <div class="text-[10px] tracking-widest uppercase mt-0.5 font-mono" style="color:rgba(201,168,76,.6)">QUEUE SYSTEM</div>
         </div>
 
         <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
           @for (tab of statusTabs; track tab.value) {
             <button (click)="activeFilter.set(tab.value)"
                     class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-sm font-medium"
-                    [style.background]="activeFilter() === tab.value ? 'rgba(255,87,34,.12)' : 'transparent'"
-                    [style.color]="activeFilter() === tab.value ? 'var(--color-lava-light)' : 'var(--color-smoke)'"
-                    [style.border]="'1px solid ' + (activeFilter() === tab.value ? 'rgba(255,87,34,.22)' : 'transparent')">
+                    [style.background]="activeFilter() === tab.value ? 'rgba(201,168,76,.10)' : 'transparent'"
+                    [style.color]="activeFilter() === tab.value ? 'var(--color-gold)' : 'var(--color-smoke)'"
+                    [style.border]="'1px solid ' + (activeFilter() === tab.value ? 'rgba(201,168,76,.22)' : 'transparent')">
               <span class="w-1.5 h-1.5 rounded-full shrink-0" [style.background]="tab.color"></span>
               {{ tab.label }}
               @if (getKpi(tab.value) > 0) {
                 <span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                      style="background:rgba(255,87,34,.2);color:var(--color-lava-light)">
+                      style="background:rgba(201,168,76,.15);color:var(--color-gold)">
                   {{ getKpi(tab.value) }}
                 </span>
               }
@@ -63,7 +63,7 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
         <div class="p-4 border-t" style="border-color:rgba(255,255,255,.06)">
           <div class="flex items-center gap-2.5 mb-3">
             <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-                 style="background:rgba(255,87,34,.2);border:1px solid rgba(255,87,34,.25);color:var(--color-lava-light)">
+                 style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.25);color:var(--color-gold)">
               {{ auth.userInitial() }}
             </div>
             <div>
@@ -124,7 +124,7 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
           @if (queuesQuery.isPending()) {
             <div class="flex items-center justify-center h-40">
               <div class="animate-spin rounded-full"
-                   style="width:28px;height:28px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--color-lava)"></div>
+                   style="width:28px;height:28px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--color-gold)"></div>
             </div>
           } @else if (filtered().length === 0) {
             <div class="flex flex-col items-center justify-center h-40 gap-3" style="color:var(--color-haze)">
@@ -163,6 +163,14 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
                       <span>📞 {{ q.customer_tel }}</span>
                       <span>👥 {{ q.pax_amount }} คน</span>
                       @if (q.table_number) { <span>🪑 โต๊ะ #{{ q.table_number }}</span> }
+                      @if (q.tier && q.tier !== 'SILVER') {
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                              [style.background]="getTierBadgeBg(q.tier)"
+                              [style.color]="getTierBadgeColor(q.tier)"
+                              [style.border]="'1px solid ' + getTierBadgeBorder(q.tier)">
+                          {{ getTierIcon(q.tier) }} {{ getTierLabel(q.tier) }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -171,6 +179,31 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
                          [style.width.%]="Math.min(100, getWaitMinutes(q.created_at) * 2)"
                          [style.background]="getHeatBarColor(q.created_at)"></div>
                   </div>
+
+                  @if (q.queue_status === 'SEATED') {
+                    <div class="mx-4 mb-3 rounded-xl px-4 py-3 text-center"
+                         style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">
+                      <div class="text-[10px] uppercase tracking-widest mb-1"
+                           style="color:var(--color-haze)">เวลาทานอาหารที่เหลือ</div>
+                      <div class="font-mono text-2xl font-bold"
+                           [style.color]="getTimerColor(q)"
+                           [class.animate-pulse]="getSecondsLeft(q) < 300">
+                        {{ getTimerDisplay(q) }}
+                      </div>
+                    </div>
+                  }
+
+                  @if (q.queue_status === 'SEATED' && q.is_paid && (q.pay_method === 'CASH_DEPOSIT' || q.pay_method === 'QR_DEPOSIT')) {
+                    <div class="mx-4 mb-2 px-3 py-2 rounded-lg"
+                         style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.20)">
+                      <div class="flex justify-between items-center text-xs">
+                        <span style="color:var(--color-jade)">✓ มัดจำแล้ว ฿{{ q.deposit_amount }}</span>
+                        <span style="color:var(--color-gold);font-weight:bold">
+                          คงเหลือ ฿{{ q.remaining_amount }}
+                        </span>
+                      </div>
+                    </div>
+                  }
 
                   <div class="px-3 pb-3 flex flex-wrap gap-2 border-t pt-2.5"
                        style="border-color:rgba(255,255,255,.05)">
@@ -191,11 +224,11 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
                       } @else {
                         <div class="flex gap-2 w-full items-center">
                           <select [(ngModel)]="selectedTable[q.queue_id]"
-                                  class="flex-1 text-xs py-1.5 px-2.5 rounded-lg outline-none"
-                                  style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);color:var(--color-ash)">
-                            <option value="">— เลือกโต๊ะ —</option>
+                                  class="flex-1 text-xs py-1.5 px-2.5 rounded-lg outline-none custom-select"
+                                  style="background:rgba(15,15,17,.95);border:1px solid rgba(201,168,76,.25);color:var(--color-ash);font-family:var(--font-sans)">
+                            <option value="" style="background:var(--color-forge);color:var(--color-smoke)">— เลือกโต๊ะ —</option>
                             @for (t of tablesQuery.data()?.tables ?? []; track t.table_id) {
-                              <option [value]="t.table_id">โต๊ะ #{{ t.table_number }} ({{ t.capacity }} ที่)</option>
+                              <option [value]="t.table_id" style="background:var(--color-forge);color:var(--color-ash)">โต๊ะ #{{ t.table_number }} ({{ t.capacity }} ที่)</option>
                             }
                           </select>
                           <button (click)="seatQueue(q)" [disabled]="!selectedTable[q.queue_id]"
@@ -206,13 +239,23 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
                     }
 
                     @if (q.queue_status === 'SEATED') {
-                      <button (click)="doAction(q.queue_id, 'finish_cash')" class="action-btn lava">💵 เงินสด</button>
-                      <button (click)="doAction(q.queue_id, 'finish_card')" class="action-btn ghost">💳 บัตร</button>
+                      @if (q.is_qr && !q.is_paid) {
+                        <a [routerLink]="['/pay', q.queue_id]" [queryParams]="{ token: q.pay_token }"
+                           class="action-btn lava" style="text-decoration:none">📱 QR จ่าย</a>
+                      } @else if (q.is_paid && (q.pay_method === 'CASH_DEPOSIT' || q.pay_method === 'QR_DEPOSIT')) {
+                        <button (click)="doAction(q.queue_id, 'finish_cash')" class="action-btn lava">💵 รับเงินสด ฿{{ q.remaining_amount }}</button>
+                        <button (click)="doAction(q.queue_id, 'finish_card')" class="action-btn ghost">💳 รับบัตร ฿{{ q.remaining_amount }}</button>
+                      } @else if (q.is_paid) {
+                        <button (click)="doAction(q.queue_id, 'finish_qr')" class="action-btn jade">✓ เสร็จสิ้น</button>
+                      } @else {
+                        <button (click)="doAction(q.queue_id, 'finish_cash')" class="action-btn lava">💵 เงินสด</button>
+                        <button (click)="doAction(q.queue_id, 'finish_card')" class="action-btn ghost">💳 บัตร</button>
+                      }
                       <button (click)="promptCancel(q)" class="action-btn danger">✕</button>
                     }
 
-                    @if (q.queue_status === 'FINISHED' && q.is_paid) {
-                      <a [routerLink]="['/receipt', q.queue_id]" class="action-btn ghost" style="text-decoration:none">🧾 ใบเสร็จ</a>
+                    @if (q.is_paid) {
+                      <a [routerLink]="['/receipt', q.queue_id]" class="action-btn ghost" style="text-decoration:none">🧾 ดูใบเสร็จ</a>
                     }
 
                   </div>
@@ -252,7 +295,7 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
 
     <style>
       .action-btn { padding:5px 12px; border-radius:8px; font-size:.78rem; font-weight:700; cursor:pointer; border:1px solid; transition:all .18s; white-space:nowrap; font-family:var(--font-sans); }
-      .action-btn.lava   { background:rgba(255,87,34,.12);  border-color:rgba(255,87,34,.28);  color:var(--color-lava-light); }
+      .action-btn.lava   { background:rgba(201,168,76,.10);  border-color:rgba(201,168,76,.28);  color:var(--color-gold); }
       .action-btn.jade   { background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.28); color:var(--color-jade); }
       .action-btn.ghost  { background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.10);color:var(--color-smoke); }
       .action-btn.danger { background:rgba(239,68,68,.10);  border-color:rgba(239,68,68,.22);  color:var(--color-crimson); }
@@ -264,18 +307,21 @@ import { Queue, Table, QueueStatus, statusLabel, heatLevel, heatClass } from '..
 export class StaffPage implements OnDestroy {
   api  = inject(ApiService)
   auth = inject(AuthService)
+  private router = inject(Router)
   private qc = injectQueryClient()
 
   activeFilter = signal<string>('ALL')
   cancelTarget = signal<Queue | null>(null)
   actionError  = signal('')
   selectedTable: Record<number, string> = {}
+  private pendingAction = ''
+  private pendingQueueId = 0
   today = new Date().toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' })
 
   queuesQuery = injectQuery(() => ({
-    queryKey: ['queues', 'active'],
+    queryKey: ['queues', 'all'],
     queryFn: () => new Promise<{ queues: Queue[] }>((res, rej) => {
-      this.api.getQueues('active').subscribe({ next: res, error: rej })
+      this.api.getQueues('all').subscribe({ next: res, error: rej })
     }),
     refetchInterval: 20_000,
   }))
@@ -297,9 +343,16 @@ export class StaffPage implements OnDestroy {
       this.qc.invalidateQueries({ queryKey: ['queues'] })
       this.qc.invalidateQueries({ queryKey: ['tables'] })
       this.actionError.set('')
+      if (this.pendingAction === 'finish_cash' || this.pendingAction === 'finish_card' || this.pendingAction === 'finish_qr') {
+        this.router.navigate(['/receipt', this.pendingQueueId])
+      }
+      this.pendingAction = ''
+      this.pendingQueueId = 0
     },
     onError: (err: unknown) => {
       this.actionError.set((err as { error?: { error?: string } }).error?.error ?? 'เกิดข้อผิดพลาด')
+      this.pendingAction = ''
+      this.pendingQueueId = 0
     },
   }))
 
@@ -332,9 +385,12 @@ export class StaffPage implements OnDestroy {
     { key: 'CANCELLED', label: 'ยกเลิก',   color: 'var(--color-crimson)' },
   ]
 
+  timerTick = signal(0)
+
   private clockInterval = setInterval(() => {
     const el = document.getElementById('clockDisplay')
     if (el) el.textContent = new Date().toLocaleTimeString('th-TH')
+    this.timerTick.update((t: number) => t + 1)
   }, 1000)
 
   ngOnDestroy() { clearInterval(this.clockInterval) }
@@ -349,6 +405,54 @@ export class StaffPage implements OnDestroy {
     const m = this.getWaitMinutes(c)
     return m < 5 ? 'rgba(74,84,104,.5)' : m < 15 ? 'rgba(245,158,11,.7)' : m < 30 ? 'rgba(255,87,34,.8)' : '#EF4444'
   }
+
+  getTierLabel(tier: string): string {
+    return TIER_LABELS[tier as TierType]?.name ?? tier
+  }
+  getTierIcon(tier: string): string {
+    return TIER_LABELS[tier as TierType]?.icon ?? '🥩'
+  }
+  getTierBadgeBg(tier: string): string {
+    const m: Record<string, string> = {
+      GOLD: 'rgba(201,168,76,.12)', PLATINUM: 'rgba(168,85,247,.12)',
+    }
+    return m[tier] ?? 'rgba(255,255,255,.06)'
+  }
+  getTierBadgeColor(tier: string): string {
+    const m: Record<string, string> = {
+      GOLD: 'var(--color-gold)', PLATINUM: '#D946EF',
+    }
+    return m[tier] ?? 'var(--color-smoke)'
+  }
+  getTierBadgeBorder(tier: string): string {
+    const m: Record<string, string> = {
+      GOLD: 'rgba(201,168,76,.30)', PLATINUM: 'rgba(168,85,247,.30)',
+    }
+    return m[tier] ?? 'rgba(255,255,255,.10)'
+  }
+
+  getSecondsLeft(q: Queue): number {
+    if (!q.buffet_ends_at) return 0
+    this.timerTick()
+    return Math.max(0, Math.floor(
+      (new Date(q.buffet_ends_at).getTime() - Date.now()) / 1000
+    ))
+  }
+  getTimerDisplay(q: Queue): string {
+    const s = this.getSecondsLeft(q)
+    if (s <= 0) return 'หมดเวลา!'
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+  }
+  getTimerColor(q: Queue): string {
+    const s = this.getSecondsLeft(q)
+    if (s <= 0) return 'var(--color-crimson)'
+    if (s < 300) return 'var(--color-crimson)'
+    if (s < 900) return '#FF6B35'
+    if (s < 1800) return 'var(--color-amber)'
+    return 'var(--color-jade)'
+  }
   statusBadgeClass(s: QueueStatus): string {
     const m: Record<QueueStatus, string> = {
       WAITING:   'bg-amber/10 border border-amber/25 text-amber-400',
@@ -360,6 +464,8 @@ export class StaffPage implements OnDestroy {
     return m[s]
   }
   doAction(id: number, action: string, extra: Record<string, unknown> = {}) {
+    this.pendingAction = action
+    this.pendingQueueId = id
     this.actionMutation.mutate({ id, action, extra })
   }
   seatQueue(q: Queue) {

@@ -12,6 +12,7 @@ services:
       MARIADB_DATABASE:      ${DB_NAME:-bbq_queue_db}
       MARIADB_USER:          ${DB_USER:-bbq_user}
       MARIADB_PASSWORD:      ${DB_PASSWORD:-bbq_pass}
+      TZ:                    Asia/Bangkok
     volumes:
       - db_data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
@@ -39,6 +40,7 @@ services:
       DB_USER:     ${DB_USER:-bbq_user}
       DB_PASSWORD: ${DB_PASSWORD:-bbq_pass}
       APP_ENV:     ${APP_ENV:-development}
+      TZ:          Asia/Bangkok
     volumes:
       - ./bbq_api:/var/www/html/api:cached
     depends_on:
