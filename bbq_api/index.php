@@ -4,9 +4,21 @@
 //  Single-file router for XAMPP simplicity
 // ══════════════════════════════════════════════
 
-// ── CORS (Angular dev server is :4200) ──
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-header("Access-Control-Allow-Origin: $origin");
+// ── CORS ──
+$allowed_origins = array_filter(array_map('trim', explode(',',
+    getenv('ALLOWED_ORIGINS') ?: 'http://localhost,http://localhost:4200'
+)));
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if (in_array($origin, $allowed_origins, true) ||
+    str_ends_with($origin, '.railway.app') ||
+    str_ends_with($origin, '.up.railway.app')) {
+    header("Access-Control-Allow-Origin: $origin");
+} else if (empty($origin)) {
+    header("Access-Control-Allow-Origin: *");
+}
+// ไม่ใส่ header ถ้า origin ไม่อยู่ในรายการ
 header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");

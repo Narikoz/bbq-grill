@@ -1,0 +1,37 @@
+FROM php:8.2-apache
+
+# Extensions
+RUN docker-php-ext-install mysqli pdo pdo_mysql
+
+# Enable modules
+RUN a2enmod rewrite headers
+
+# Apache config
+RUN sed -i 's|<Directory /var/www/>|<Directory /var/www/html/>|g' \
+        /etc/apache2/apache2.conf && \
+    sed -i 's/AllowOverride None/AllowOverride All/g' \
+        /etc/apache2/apache2.conf
+
+# PHP production settings
+RUN echo "upload_max_filesize = 20M"    >> /usr/local/etc/php/conf.d/app.ini && \
+    echo "post_max_size = 20M"          >> /usr/local/etc/php/conf.d/app.ini && \
+    echo "memory_limit = 256M"          >> /usr/local/etc/php/conf.d/app.ini && \
+    echo "display_errors = Off"         >> /usr/local/etc/php/conf.d/app.ini && \
+    echo "log_errors = On"              >> /usr/local/etc/php/conf.d/app.ini && \
+    echo "date.timezone = Asia/Bangkok" >> /usr/local/etc/php/conf.d/app.ini
+
+# Copy API source
+COPY bbq_api/ /var/www/html/api/
+
+# Apache VirtualHost config
+RUN echo '<VirtualHost *:80>\n\
+    DocumentRoot /var/www/html\n\
+    Alias /api /var/www/html/api\n\
+    <Directory /var/www/html/api>\n\
+        Options Indexes FollowSymLinks\n\
+        AllowOverride All\n\
+        Require all granted\n\
+    </Directory>\n\
+</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+
+EXPOSE 80
