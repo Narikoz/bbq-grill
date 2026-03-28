@@ -1387,7 +1387,9 @@ if ($p = match_route('POST', '/vouchers', $path, $method)) {
     $code         = strtoupper(trim($b['code'] ?? ''));
     $discount_pct = (float)($b['discount_pct'] ?? 0);
     $max_uses     = (int)($b['max_uses'] ?? 1);
-    $expires_at   = trim($b['expires_at'] ?? '') ?: null;
+    $expires_raw  = trim($b['expires_at'] ?? '');
+    // datetime-local sends YYYY-MM-DDTHH:MM — convert to MySQL YYYY-MM-DD HH:MM:SS
+    $expires_at   = $expires_raw ? str_replace('T', ' ', $expires_raw) . ':00' : null;
     $description  = trim($b['description'] ?? '');
     $is_active    = isset($b['is_active']) ? (int)$b['is_active'] : 1;
 
@@ -1399,14 +1401,14 @@ if ($p = match_route('POST', '/vouchers', $path, $method)) {
         INSERT INTO vouchers (code, discount_pct, max_uses, expires_at, description, is_active)
         VALUES (?, ?, ?, ?, ?, ?)
     ");
-    $stmt->bind_param('sdiisi', $code, $discount_pct, $max_uses, $expires_at, $description, $is_active);
+    $stmt->bind_param('sdissi', $code, $discount_pct, $max_uses, $expires_at, $description, $is_active);
     try {
         $stmt->execute();
         $id = (int)$conn->insert_id;
         $stmt->close();
         json_out(['ok' => true, 'voucher_id' => $id], 201);
     } catch (Throwable $e) {
-        json_out(['error' => 'โค้ดนี้มีอยู่แล้ว'], 409);
+        json_out(['error' => 'โค้ดนี้มีอยู่แล้ว: ' . $e->getMessage()], 409);
     }
 }
 
