@@ -172,6 +172,10 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
                   <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcVat(p) | number:'1.2-2' }}</span>
                 </div>
                 @if (getDiscount(p) > 0) {
+                  <div class="flex justify-between py-1.5 text-sm" style="border-top:1px solid rgba(255,255,255,.06);margin-top:4px;padding-top:8px">
+                    <span style="color:var(--color-smoke)">ยอดรวมก่อนส่วนลด</span>
+                    <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ (calcSubtotal(p) + calcService(p) + calcVat(p)) | number:'1.2-2' }}</span>
+                  </div>
                   <div class="flex justify-between py-1.5 text-sm">
                     <span style="color:var(--color-jade)">ส่วนลด {{ getDiscountPct(p) > 0 ? getDiscountPct(p) + '%' : '' }}{{ getVoucherCode(p) ? ' (' + getVoucherCode(p) + ')' : '' }}</span>
                     <span class="font-mono font-semibold" style="color:var(--color-jade)">-฿{{ getDiscount(p) | number:'1.2-2' }}</span>
