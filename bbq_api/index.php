@@ -435,7 +435,7 @@ if ($p = match_route('POST', '/queues', $path, $method)) {
 
         $vc_param = $voucher_code ?: null;
         $stmt = $conn->prepare("INSERT INTO queues (customer_id, pax_amount, tier, booking_time, queue_status, pay_method, pay_token, pay_token_expires, slot_id, voucher_code, discount_amount) VALUES (?,?,?,?,'WAITING',?,?,?,?,?,?)");
-        $stmt->bind_param("iisssssissd", $cid, $pax, $tier, $time, $pay_method, $token, $expires, $slot_id, $vc_param, $discount_amount);
+        $stmt->bind_param("iissssissd", $cid, $pax, $tier, $time, $pay_method, $token, $expires, $slot_id, $vc_param, $discount_amount);
         $stmt->execute();
         $qid_int = (int)$conn->insert_id;
         $stmt->close();
