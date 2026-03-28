@@ -52,24 +52,83 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
       padding-left: 22px;
     }
 
-    /* ═══ PRINT ═══ */
+    /* ═══ PRINT / PDF ═══ */
     @media print {
+      @page { size: A4 portrait; margin: 18mm 16mm; }
+
+      /* Override dark-theme CSS vars — all var(--color-*) inline styles auto-update */
+      :root {
+        --color-gold:   #92400e; --color-ash:   #111827;
+        --color-smoke:  #374151; --color-jade:  #065f46;
+        --color-haze:   #9ca3af;
+        --font-display: Georgia,'Times New Roman',serif;
+        --font-sans:    Arial,Helvetica,sans-serif;
+        --font-mono:    'Courier New',Courier,monospace;
+      }
       :host { display: block !important; }
-      .no-print { display: none !important; }
-      .receipt-wrap { max-width: 100% !important; padding: 0 !important; }
-      .glass-card {
-        background: #fff !important; border: none !important;
-        box-shadow: none !important; border-radius: 0 !important;
+      html,body { background:#fff !important; }
+      * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+          animation:none !important; transition:none !important;
+          backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+      .no-print { display:none !important; }
+      .min-h-dvh  { min-height:0 !important; display:block !important; padding:0 !important; }
+      .receipt-wrap { max-width:100% !important; width:100% !important; padding:0 !important; }
+      .animate-thermal-in {
+        animation:none !important; box-shadow:none !important;
+        border-radius:0 !important; overflow:visible !important;
+        border:1.5px solid #d1d5db !important;
       }
+      /* Success header */
       .success-head {
-        background: #f0fdf4 !important; border-color: #bbf7d0 !important;
-        border-radius: 0 !important;
+        background:linear-gradient(180deg,#f0fdf4,#ecfdf5) !important;
+        border:none !important; border-bottom:2px solid #a7f3d0 !important;
+        border-radius:0 !important;
       }
-      .print-body { background: #fff !important; border-color: #e5e7eb !important; }
-      .row-item   { border-color: #f3f4f6 !important; }
-      .dashed-div { border-color: #e2e8f0 !important; }
-      .grand-zone { background: #fefce8 !important; border-color: #fcd34d !important; }
-      * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .success-ring { background:linear-gradient(135deg,#34D399,#059669) !important; box-shadow:0 0 0 6px rgba(16,185,129,.15) !important; }
+      .success-head h2 { color:#064e3b !important; }
+      .success-head p  { color:#059669 !important; }
+      /* Store strip */
+      .success-head + div {
+        background:#fff !important; border:none !important;
+        border-bottom:1.5px solid #e5e7eb !important;
+      }
+      /* Fix BBQ GRILL gradient-clip text */
+      .font-display.text-xl.tracking-widest {
+        background:none !important; -webkit-background-clip:unset !important;
+        background-clip:unset !important; -webkit-text-fill-color:#92400e !important; color:#92400e !important;
+      }
+      /* Queue ID badge */
+      .success-head + div .font-mono.text-sm.font-semibold {
+        background:#fef3c7 !important; border:1px solid #f59e0b !important; color:#92400e !important;
+      }
+      /* Body */
+      .print-body { background:#fff !important; border:none !important; }
+      .tracking-widest { color:#9ca3af !important; }
+      /* Rows */
+      .row-item { border-bottom:1px solid #f0f0f0 !important; background:transparent !important; }
+      .row-item:hover { background:transparent !important; border-left:none !important; padding-left:24px !important; }
+      .dashed-div { border-top-color:#d1d5db !important; }
+      .px-6.py-3  { border-bottom-color:#e5e7eb !important; }
+      /* Grand zone */
+      .grand-zone {
+        background:#fffbeb !important; border:2px solid #d97706 !important; border-radius:8px !important;
+      }
+      .grand-zone .num-display   { color:#111827 !important; font-weight:700 !important; }
+      .grand-zone .font-semibold { color:#92400e !important; }
+      /* Deposit remaining zone */
+      .mx-5.my-4 > div:last-child {
+        background:#fffbeb !important; border:2px solid #d97706 !important; border-radius:8px !important;
+      }
+      .mx-5.my-4 > div:last-child .num-display   { color:#111827 !important; font-weight:700 !important; }
+      .mx-5.my-4 > div:last-child .font-semibold { color:#92400e !important; }
+      .mx-5.my-4 > div:not(:last-child) { background:transparent !important; }
+      /* Payment badge */
+      .text-xs.font-bold.rounded-lg { background:#ecfdf5 !important; border-color:#6ee7b7 !important; color:#065f46 !important; }
+      /* Ref box */
+      .mx-5.mb-4 { background:#f9fafb !important; border-color:#e5e7eb !important; border-radius:6px !important; }
+      /* Typography */
+      .num-display { color:#111827 !important; }
+      .glass-card  { background:#fff !important; border:1px solid #e5e7eb !important; box-shadow:none !important; border-radius:0 !important; }
     }
   `],
   template: `
