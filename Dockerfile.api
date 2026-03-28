@@ -3,8 +3,10 @@ FROM php:8.2-apache
 # Extensions
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Fix AH00534: remove ALL mpm_* symlinks, then hard-link only mpm_prefork.
-# Using direct symlink manipulation avoids any Apache config-check during build.
+# ── MPM fix ───────────────────────────────────────────────────────────────────
+# a2enmod/a2dismod call "service apache2 restart" on Debian which triggers a
+# config-check that can expose/re-enable a second MPM. Never call a2enmod here.
+# Instead: wipe ALL mpm_* symlinks, then create ONLY mpm_prefork ones directly.
 RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
           /etc/apache2/mods-enabled/mpm_*.conf && \
     ln -sf /etc/apache2/mods-available/mpm_prefork.load \
@@ -12,8 +14,19 @@ RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
     ln -sf /etc/apache2/mods-available/mpm_prefork.conf \
            /etc/apache2/mods-enabled/mpm_prefork.conf
 
-# Enable rewrite and headers (no MPM side-effects)
-RUN a2enmod rewrite headers
+# ── Enable rewrite + headers via direct symlinks (zero a2enmod calls) ─────────
+RUN ln -sf /etc/apache2/mods-available/rewrite.load \
+           /etc/apache2/mods-enabled/rewrite.load && \
+    ln -sf /etc/apache2/mods-available/headers.load \
+           /etc/apache2/mods-enabled/headers.load
+
+# ── Debug: print module state in Railway build log ────────────────────────────
+RUN echo ">>> mods-enabled:" && \
+    ls -la /etc/apache2/mods-enabled/ && \
+    echo ">>> LoadModule mpm references:" && \
+    grep -R "LoadModule.*mpm" /etc/apache2 || true && \
+    echo ">>> mpm_ occurrences in conf:" && \
+    grep -R "mpm_" /etc/apache2 || true
 
 # Apache global config — allow .htaccess overrides
 RUN sed -i 's|<Directory /var/www/>|<Directory /var/www/html/>|g' \
@@ -32,7 +45,7 @@ RUN echo "upload_max_filesize = 20M"    >> /usr/local/etc/php/conf.d/app.ini && 
 # Copy API source
 COPY bbq_api/ /var/www/html/api/
 
-# Copy dedicated VirtualHost config (replaces inline echo)
+# Copy dedicated VirtualHost config
 COPY docker/apache/api-vhost.conf /etc/apache2/sites-available/000-default.conf
 
 EXPOSE 80
