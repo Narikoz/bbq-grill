@@ -111,6 +111,27 @@ export const TimeSlotSchema = z.object({
 })
 export type TimeSlot = z.infer<typeof TimeSlotSchema>
 
+// ─── Voucher ─────────────────────────────────────────────────
+export interface Voucher {
+  voucher_id:   number
+  code:         string
+  discount_pct: number
+  max_uses:     number
+  used_count:   number
+  expires_at:   string | null
+  is_active:    number
+  description:  string | null
+  created_at:   string
+}
+
+export interface VoucherValidation {
+  ok:           boolean
+  code:         string
+  discount_pct: number
+  description:  string
+  expires_at:   string | null
+}
+
 // ─── Booking Form Schema ─────────────────────────────────────
 export const BookingFormSchema = z.object({
   customer_name: z.string().min(2, 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร'),
@@ -120,6 +141,7 @@ export const BookingFormSchema = z.object({
   booking_date:  z.string(),
   pay_method:    z.enum(['CASH_DEPOSIT','QR_FULL','QR_DEPOSIT']),
   tier:          z.enum(['SILVER','GOLD','PLATINUM']).optional(),
+  voucher_code:  z.string().optional(),
 })
 export type BookingForm = z.infer<typeof BookingFormSchema>
 

@@ -73,6 +73,22 @@ if ($col && $col->num_rows === 0) {
     $conn->query("ALTER TABLE contact_messages ADD COLUMN customer_email VARCHAR(150) DEFAULT NULL AFTER customer_tel");
 }
 
+// ── Vouchers ──
+$conn->query("CREATE TABLE IF NOT EXISTS vouchers (
+  voucher_id    INT AUTO_INCREMENT PRIMARY KEY,
+  code          VARCHAR(32) NOT NULL UNIQUE,
+  discount_pct  DECIMAL(5,2) NOT NULL DEFAULT 0,
+  max_uses      INT NOT NULL DEFAULT 1,
+  used_count    INT NOT NULL DEFAULT 0,
+  expires_at    DATETIME,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  description   VARCHAR(255),
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$conn->query("ALTER TABLE queues ADD COLUMN IF NOT EXISTS voucher_code VARCHAR(32) DEFAULT NULL AFTER pay_method");
+$conn->query("ALTER TABLE queues ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER voucher_code");
+
 // ── VAPID Web Push ──
 define('VAPID_PUBLIC',  'BHXRLotk_zLnzPtx__Vv6GE-6dBnoas-KO3r7GAyoUigAfOqgtwKVp3QpkINLlOP7_tK071XpABPO7EquVfqWbA');
 define('VAPID_PRIVATE', 'LhRMGaFPDb3Uk56q07bsZSwsUn_qIZla-a6EJjjIlss');
@@ -367,6 +383,11 @@ if ($p = match_route('POST', '/queues', $path, $method)) {
 
     $time = $booking_date . ' ' . substr($slot['slot_time'], 0, 5) . ':00';
 
+    // Voucher (extracted before transaction; FOR UPDATE lock happens inside)
+    $voucher_code    = strtoupper(trim($b['voucher_code'] ?? ''));
+    $discount_pct    = 0.0;
+    $discount_amount = 0.0;
+
     $conn->begin_transaction();
     try {
         // Upsert customer
@@ -380,25 +401,51 @@ if ($p = match_route('POST', '/queues', $path, $method)) {
         })();
         $stmt->close();
 
-        // Generate QR token for all pay methods (deposit or full)
-        $token   = bin2hex(random_bytes(16));
-        $expires = date('Y-m-d H:i:s', time() + 30 * 60); // 30 min
-
-        $stmt = $conn->prepare("INSERT INTO queues (customer_id, pax_amount, tier, booking_time, queue_status, pay_method, pay_token, pay_token_expires, slot_id) VALUES (?,?,?,?,'WAITING',?,?,?,?)");
-        $stmt->bind_param("iisssssi", $cid, $pax, $tier, $time, $pay_method, $token, $expires, $slot_id);
-        $stmt->execute();
-        $qid_int = (int)$conn->insert_id;
-        $stmt->close();
-
-        $conn->commit();
-
-        // Compute amount shown on QR
+        // Compute price (inside transaction so discount is consistent)
         $pp_n       = tier_price($tier);
         $subtotal_n = $pax * $pp_n;
         $service_n  = round($subtotal_n * 0.10, 2);
         $vat_n      = round(($subtotal_n + $service_n) * 0.07, 2);
         $grand_n    = $subtotal_n + $service_n + $vat_n;
-        $deposit_n  = $pax * 100;
+
+        // Validate voucher with row-level lock
+        if ($voucher_code !== '') {
+            $sv = $conn->prepare("SELECT voucher_id, discount_pct, max_uses, used_count, expires_at, is_active FROM vouchers WHERE code = ? LIMIT 1 FOR UPDATE");
+            $sv->bind_param('s', $voucher_code);
+            $sv->execute();
+            $vrow = $sv->get_result()->fetch_assoc();
+            $sv->close();
+
+            if (!$vrow || !(int)$vrow['is_active'] ||
+                ($vrow['expires_at'] && strtotime($vrow['expires_at']) < time()) ||
+                ($vrow['max_uses'] > 0 && (int)$vrow['used_count'] >= (int)$vrow['max_uses'])) {
+                $conn->rollback();
+                json_out(['error' => 'โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุ'], 400);
+            }
+            $discount_pct    = (float)$vrow['discount_pct'];
+            $discount_amount = round($grand_n * ($discount_pct / 100), 2);
+        }
+
+        $grand_n_after = $grand_n - $discount_amount;
+        $deposit_n     = $pax * 100;
+
+        // Generate QR token for all pay methods (deposit or full)
+        $token   = bin2hex(random_bytes(16));
+        $expires = date('Y-m-d H:i:s', time() + 30 * 60); // 30 min
+
+        $vc_param = $voucher_code ?: null;
+        $stmt = $conn->prepare("INSERT INTO queues (customer_id, pax_amount, tier, booking_time, queue_status, pay_method, pay_token, pay_token_expires, slot_id, voucher_code, discount_amount) VALUES (?,?,?,?,'WAITING',?,?,?,?,?,?)");
+        $stmt->bind_param("iisssssissd", $cid, $pax, $tier, $time, $pay_method, $token, $expires, $slot_id, $vc_param, $discount_amount);
+        $stmt->execute();
+        $qid_int = (int)$conn->insert_id;
+        $stmt->close();
+
+        // Increment used_count atomically
+        if ($voucher_code !== '') {
+            $conn->query("UPDATE vouchers SET used_count = used_count + 1 WHERE code = '" . $conn->real_escape_string($voucher_code) . "'");
+        }
+
+        $conn->commit();
 
         $base_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
         $data = [
@@ -414,7 +461,10 @@ if ($p = match_route('POST', '/queues', $path, $method)) {
             'pay_token_expires'=> $expires,
             'pay_link'         => $base_url . '/#/pay/' . $qid_int . '?token=' . urlencode($token),
             'deposit_amount'   => $deposit_n,
-            'remaining_amount' => round($grand_n - $deposit_n, 2),
+            'voucher_code'     => $voucher_code ?: null,
+            'discount_pct'     => $discount_pct,
+            'discount_amount'  => $discount_amount,
+            'remaining_amount' => round($grand_n_after - $deposit_n, 2),
         ];
         json_out($data, 201);
     } catch (Throwable $e) {
@@ -663,7 +713,7 @@ if ($p = match_route('GET', '/payments/{queue_id}', $path, $method)) {
     $token   = trim($_GET['token'] ?? '');
 
     $stmt = $conn->prepare("
-        SELECT q.queue_id, q.pax_amount, q.tier, q.booking_time, q.queue_status, q.pay_token, q.pay_token_expires,
+        SELECT q.queue_id, q.pax_amount, q.tier, q.pay_method, q.booking_time, q.queue_status, q.pay_token, q.pay_token_expires,
                c.customer_name, c.customer_tel,
                t.table_number
         FROM queues q
@@ -710,6 +760,16 @@ if ($p = match_route('GET', '/payments/{queue_id}', $path, $method)) {
     $d['price_per_person'] = tier_price($d['tier'] ?? 'SILVER');
     $d['pay_method_label'] = ['CASH'=>'เงินสด','QR'=>'QR PromptPay','PROMPTPAY'=>'QR PromptPay','CARD'=>'บัตรเครดิต/เดบิต'][$d['payment_method'] ?? ''] ?? ($d['payment_method'] ?? '-');
 
+    $pax_d   = (int)($d['pax_amount'] ?? 0);
+    $pp_d    = tier_price($d['tier'] ?? 'SILVER');
+    $sub_d   = $pax_d * $pp_d;
+    $svc_d   = round($sub_d * 0.10, 2);
+    $vat_d   = round(($sub_d + $svc_d) * 0.07, 2);
+    $grand_d = $sub_d + $svc_d + $vat_d;
+    $dep_d   = $pax_d * 100;
+    $d['deposit_amount']   = $dep_d;
+    $d['remaining_amount'] = round($grand_d - $dep_d, 2);
+
     json_out($d);
 }
 
@@ -735,6 +795,61 @@ if ($p = match_route('GET', '/payments/all/{queue_id}', $path, $method)) {
     $stmt->close();
 
     json_out(['payments' => $payments]);
+}
+
+// ══════════════════════════════════════════════
+//  QUEUE PUBLIC (token-based, no auth required)
+// ══════════════════════════════════════════════
+if ($p = match_route('GET', '/queue-public/{queue_id}', $path, $method)) {
+    global $conn;
+    $qid_int = (int)$p['queue_id'];
+    $token   = trim($_GET['token'] ?? '');
+
+    if ($qid_int <= 0 || $token === '') json_out(['error' => 'ข้อมูลไม่ครบ'], 400);
+
+    $stmt = $conn->prepare("
+        SELECT q.queue_id, q.pax_amount, q.tier, q.pay_method, q.booking_time,
+               q.queue_status, q.pay_token, q.pay_token_expires,
+               q.created_at, q.seated_at, q.table_id,
+               c.customer_name, c.customer_tel,
+               t.table_number,
+               p.payment_id, p.payment_method AS paid_method, p.payment_time
+        FROM queues q
+        JOIN customers c  ON q.customer_id = c.customer_id
+        LEFT JOIN tables t ON q.table_id = t.table_id
+        LEFT JOIN payments p ON p.queue_id = q.queue_id
+        WHERE q.queue_id = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $qid_int); $stmt->execute();
+    $d = $stmt->get_result()->fetch_assoc(); $stmt->close();
+
+    if (!$d) json_out(['error' => 'ไม่พบคิว'], 404);
+    if (empty($d['pay_token'])) {
+        // pay_token cleared after payment confirmed — allow only if queue is already paid
+        if (empty($d['payment_id'])) json_out(['error' => 'Token ไม่ถูกต้อง'], 403);
+    } elseif (!hash_equals((string)$d['pay_token'], $token)) {
+        json_out(['error' => 'Token ไม่ถูกต้อง'], 403);
+    }
+
+    $pax_q   = (int)$d['pax_amount'];
+    $tier_q  = $d['tier'] ?? 'SILVER';
+    $pp_q    = tier_price($tier_q);
+    $sub_q   = $pax_q * $pp_q;
+    $svc_q   = round($sub_q * 0.10, 2);
+    $vat_q   = round(($sub_q + $svc_q) * 0.07, 2);
+    $grand_q = $sub_q + $svc_q + $vat_q;
+    $dep_q   = $pax_q * 100;
+
+    $d['queue_id_str']     = qid($qid_int);
+    $d['price_per_person'] = $pp_q;
+    $d['deposit_amount']   = $dep_q;
+    $d['remaining_amount'] = round($grand_q - $dep_q, 2);
+    $d['is_paid']          = !empty($d['payment_id']);
+    $d['is_qr']            = !empty($d['pay_token']);
+    $d['created_at']       = $d['created_at'] ?? $d['booking_time'];
+
+    json_out($d);
 }
 
 // ══════════════════════════════════════════════
@@ -1217,6 +1332,112 @@ if ($p = match_route('DELETE', '/contact-messages', $path, $method)) {
     require_admin();
     global $conn;
     $conn->query("DELETE FROM contact_messages");
+    json_out(['ok' => true]);
+}
+
+// ══════════════════════════════════════════════
+//  VOUCHERS
+// ══════════════════════════════════════════════
+
+if ($p = match_route('POST', '/vouchers/validate', $path, $method)) {
+    global $conn;
+    $b    = body();
+    $code = strtoupper(trim($b['code'] ?? ''));
+
+    if ($code === '') json_out(['error' => 'กรุณากรอกโค้ด'], 400);
+
+    $stmt = $conn->prepare("
+        SELECT voucher_id, code, discount_pct, max_uses, used_count, expires_at, is_active, description
+        FROM vouchers WHERE code = ? LIMIT 1
+    ");
+    $stmt->bind_param('s', $code);
+    $stmt->execute();
+    $v = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$v)                   json_out(['error' => 'ไม่พบโค้ดส่วนลดนี้'], 404);
+    if (!(int)$v['is_active']) json_out(['error' => 'โค้ดนี้ถูกปิดใช้งานแล้ว'], 400);
+    if ($v['expires_at'] && strtotime($v['expires_at']) < time())
+                               json_out(['error' => 'โค้ดหมดอายุแล้ว'], 400);
+    if ($v['max_uses'] > 0 && (int)$v['used_count'] >= (int)$v['max_uses'])
+                               json_out(['error' => 'โค้ดนี้ถูกใช้ครบจำนวนแล้ว'], 400);
+
+    json_out([
+        'ok'           => true,
+        'code'         => $v['code'],
+        'discount_pct' => (float)$v['discount_pct'],
+        'description'  => $v['description'] ?? '',
+        'expires_at'   => $v['expires_at'],
+    ]);
+}
+
+if ($p = match_route('GET', '/vouchers', $path, $method)) {
+    require_admin();
+    global $conn;
+    $result = $conn->query("SELECT * FROM vouchers ORDER BY created_at DESC");
+    $list   = $result->fetch_all(MYSQLI_ASSOC);
+    json_out(['vouchers' => $list]);
+}
+
+if ($p = match_route('POST', '/vouchers', $path, $method)) {
+    require_admin();
+    global $conn;
+
+    $b            = body();
+    $code         = strtoupper(trim($b['code'] ?? ''));
+    $discount_pct = (float)($b['discount_pct'] ?? 0);
+    $max_uses     = (int)($b['max_uses'] ?? 1);
+    $expires_at   = trim($b['expires_at'] ?? '') ?: null;
+    $description  = trim($b['description'] ?? '');
+    $is_active    = isset($b['is_active']) ? (int)$b['is_active'] : 1;
+
+    if ($code === '')  json_out(['error' => 'กรุณากรอกโค้ด'], 400);
+    if (!preg_match('/^[A-Z0-9_\-]{3,32}$/', $code)) json_out(['error' => 'โค้ดต้องเป็นตัวอักษรภาษาอังกฤษ/ตัวเลข 3-32 ตัว'], 400);
+    if ($discount_pct <= 0 || $discount_pct > 100) json_out(['error' => 'ส่วนลดต้อง 1-100%'], 400);
+
+    $stmt = $conn->prepare("
+        INSERT INTO vouchers (code, discount_pct, max_uses, expires_at, description, is_active)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->bind_param('sdiisi', $code, $discount_pct, $max_uses, $expires_at, $description, $is_active);
+    try {
+        $stmt->execute();
+        $id = (int)$conn->insert_id;
+        $stmt->close();
+        json_out(['ok' => true, 'voucher_id' => $id], 201);
+    } catch (Throwable $e) {
+        json_out(['error' => 'โค้ดนี้มีอยู่แล้ว'], 409);
+    }
+}
+
+if ($p = match_route('PATCH', '/vouchers/{id}', $path, $method)) {
+    require_admin();
+    global $conn;
+
+    $vid    = (int)$p['id'];
+    $b      = body();
+    $fields = []; $types = ''; $values = [];
+
+    if (isset($b['is_active']))   { $fields[] = 'is_active=?';   $types .= 'i'; $values[] = (int)$b['is_active']; }
+    if (isset($b['max_uses']))    { $fields[] = 'max_uses=?';    $types .= 'i'; $values[] = (int)$b['max_uses']; }
+    if (isset($b['expires_at']))  { $fields[] = 'expires_at=?';  $types .= 's'; $values[] = $b['expires_at'] ?: null; }
+    if (isset($b['description'])) { $fields[] = 'description=?'; $types .= 's'; $values[] = $b['description']; }
+    if (!$fields) json_out(['error' => 'ไม่มีข้อมูลที่จะอัปเดต'], 400);
+
+    $values[] = $vid; $types .= 'i';
+    $stmt = $conn->prepare('UPDATE vouchers SET ' . implode(',', $fields) . ' WHERE voucher_id=?');
+    $stmt->bind_param($types, ...$values);
+    $stmt->execute(); $stmt->close();
+    json_out(['ok' => true]);
+}
+
+if ($p = match_route('DELETE', '/vouchers/{id}', $path, $method)) {
+    require_admin();
+    global $conn;
+
+    $vid  = (int)$p['id'];
+    $stmt = $conn->prepare("DELETE FROM vouchers WHERE voucher_id=?");
+    $stmt->bind_param('i', $vid); $stmt->execute(); $stmt->close();
     json_out(['ok' => true]);
 }
 

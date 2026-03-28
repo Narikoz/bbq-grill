@@ -8,7 +8,7 @@ import { CommonModule } from '@angular/common'
 import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental'
 import { ApiService } from '../../core/services/api.service'
 import { AnimationService } from '../../core/services/animation.service'
-import { calcBreakdown, PRICE_PER_PERSON, BookingFormSchema, Queue, TimeSlot, TIER_LIST, TIER_PRICES, TIER_LABELS, TierType, tierPrice } from '../../core/models'
+import { calcBreakdown, PRICE_PER_PERSON, BookingFormSchema, Queue, TimeSlot, TIER_LIST, TIER_PRICES, TIER_LABELS, TierType, tierPrice, VoucherValidation } from '../../core/models'
 import { z } from 'zod'
 
 @Component({
@@ -253,6 +253,50 @@ import { z } from 'zod'
               }
             </div>
 
+            <div class="pt-1">
+              <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                     style="color:var(--color-smoke);font-family:var(--font-sans)">
+                โค้ดส่วนลด (ถ้ามี)
+              </label>
+              @if (!voucherResult()) {
+                <div class="flex gap-2">
+                  <input type="text" placeholder="VOUCHER CODE"
+                         [value]="voucherCode()"
+                         (input)="voucherCode.set($any($event.target).value.toUpperCase())"
+                         (keydown.enter)="applyVoucher()"
+                         class="flex-1 px-4 py-3 rounded-xl text-sm outline-none font-mono tracking-wider uppercase"
+                         style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);color:var(--color-ash)">
+                  <button type="button" (click)="applyVoucher()" [disabled]="voucherLoading() || !voucherCode().trim()"
+                          class="px-5 py-3 rounded-xl text-sm font-semibold"
+                          style="background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);color:var(--color-gold);cursor:pointer;font-family:var(--font-sans)"
+                          [style.opacity]="voucherLoading() || !voucherCode().trim() ? '.5' : '1'">
+                    {{ voucherLoading() ? '...' : 'ใช้โค้ด' }}
+                  </button>
+                </div>
+                @if (voucherError()) {
+                  <p class="text-xs mt-1.5" style="color:var(--color-crimson);font-family:var(--font-sans)">
+                    ⚠ {{ voucherError() }}
+                  </p>
+                }
+              }
+              @if (voucherResult()) {
+                <div class="flex items-center justify-between px-4 py-3 rounded-xl"
+                     style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22)">
+                  <div class="flex items-center gap-2">
+                    <span style="color:var(--color-jade)">✓</span>
+                    <div>
+                      <div class="text-sm font-bold font-mono" style="color:var(--color-jade)">{{ voucherResult()!.code }}</div>
+                      <div class="text-xs" style="color:var(--color-smoke);font-family:var(--font-sans)">
+                        ลด {{ voucherResult()!.discount_pct }}% = -฿{{ discountAmount().toFixed(0) }}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" (click)="removeVoucher()"
+                          style="background:none;border:none;cursor:pointer;color:var(--color-haze);font-size:16px">✕</button>
+                </div>
+              }
+            </div>
+
             @if (payMethod() === 'QR') {
               <div class="pt-1">
                 <label class="block text-xs font-semibold tracking-widest uppercase mb-3" style="color:var(--color-smoke);font-family:var(--font-sans)">ยอดที่ต้องจ่าย</label>
@@ -325,9 +369,15 @@ import { z } from 'zod'
               <div class="flex justify-between text-xs" style="color:var(--color-smoke);font-family:var(--font-sans)">
                 <span>VAT 7%</span><span class="font-mono">฿{{ b.vat.toFixed(2) }}</span>
               </div>
+              @if (discountAmount() > 0) {
+                <div class="flex justify-between text-xs" style="color:var(--color-jade);font-family:var(--font-sans)">
+                  <span>ส่วนลด {{ voucherResult()!.discount_pct }}% ({{ voucherResult()!.code }})</span>
+                  <span class="font-mono">-฿{{ discountAmount().toFixed(2) }}</span>
+                </div>
+              }
               <div class="flex justify-between items-center pt-2" style="border-top:1px solid rgba(201,168,76,.15)">
                 <span class="text-sm font-semibold" style="color:var(--color-gold);font-family:var(--font-sans)">ยอดรวม</span>
-                <span class="font-display text-2xl" style="color:var(--color-ash)">฿{{ b.grand.toFixed(2) }}</span>
+                <span class="font-display text-2xl" style="color:var(--color-ash)">฿{{ grandAfterDiscount().toFixed(2) }}</span>
               </div>
             </div>
           </div>
@@ -475,6 +525,11 @@ export class BookingPage {
   successData = signal<Queue | null>(null)
   mutateError = signal('')
 
+  voucherCode    = signal('')
+  voucherResult  = signal<VoucherValidation | null>(null)
+  voucherError   = signal('')
+  voucherLoading = signal(false)
+
   tierList   = TIER_LIST
   tierPrices = TIER_PRICES
   tierLabels: Record<string, { name: string; desc: string; icon: string }> = {
@@ -498,6 +553,16 @@ export class BookingPage {
   currentPrice = computed(() => tierPrice(this.selectedTier()))
   depositAmount = computed(() => this.pax() * 100)
   breakdown = computed(() => calcBreakdown(this.pax(), this.selectedTier()))
+
+  discountAmount = computed(() => {
+    const b   = this.breakdown()
+    const pct = this.voucherResult()?.discount_pct ?? 0
+    return pct > 0 ? parseFloat((b.grand * pct / 100).toFixed(2)) : 0
+  })
+
+  grandAfterDiscount = computed(() =>
+    parseFloat((this.breakdown().grand - this.discountAmount()).toFixed(2))
+  )
 
   stepDefs = [
     { num: 1, label: 'วันเวลา' },
@@ -569,19 +634,23 @@ export class BookingPage {
     if (this.payMethod() === 'CASH') {
       pm = '💵 เงินสด (มัดจำ QR ฿' + this.depositAmount() + ')'
     } else if (this.qrType() === 'QR_FULL') {
-      pm = '📱 QR เต็มจำนวน ฿' + this.breakdown().grand.toFixed(0)
+      pm = '📱 QR เต็มจำนวน ฿' + this.grandAfterDiscount().toFixed(0)
     } else {
-      pm = '🔒 QR มัดจำ ฿' + this.depositAmount() + ' (คงเหลือ ฿' + (this.breakdown().grand - this.depositAmount()).toFixed(0) + ' หน้าร้าน)'
+      pm = '🔒 QR มัดจำ ฿' + this.depositAmount() + ' (คงเหลือ ฿' + (this.grandAfterDiscount() - this.depositAmount()).toFixed(0) + ' หน้าร้าน)'
     }
     const slot = this.slotsQuery.data()?.slots.find((s: TimeSlot) => s.slot_id === this.selectedSlotId())
     const dt   = slot ? `${this.selectedDate()} เวลา ${slot.slot_time}` : '-'
-    return [
+    const rows: { label: string; value: string }[] = [
       { label: 'ชื่อ',          value: v.customer_name || '-' },
       { label: 'เบอร์โทร',      value: v.customer_tel  || '-' },
       { label: 'จำนวนคน',      value: `${this.pax()} คน` },
       { label: 'วันเวลา',       value: dt },
       { label: 'วิธีชำระเงิน', value: pm },
     ]
+    if (this.discountAmount() > 0) {
+      rows.push({ label: `ส่วนลด (${this.voucherResult()!.discount_pct}% - ${this.voucherResult()!.code})`, value: `-฿${this.discountAmount().toFixed(2)}` })
+    }
+    return rows
   })
 
   submit() {
@@ -602,7 +671,32 @@ export class BookingPage {
       booking_date:  this.selectedDate(),
       pay_method:    payMethodFinal,
       tier:          this.selectedTier(),
+      voucher_code:  this.voucherResult()?.code ?? undefined,
     })
+  }
+
+  applyVoucher() {
+    const code = this.voucherCode().trim().toUpperCase()
+    if (!code) return
+    this.voucherLoading.set(true)
+    this.voucherError.set('')
+    this.voucherResult.set(null)
+    this.api.validateVoucher(code).subscribe({
+      next: (res) => {
+        this.voucherResult.set(res)
+        this.voucherLoading.set(false)
+      },
+      error: (err) => {
+        this.voucherError.set(err?.error?.error ?? 'โค้ดไม่ถูกต้อง')
+        this.voucherLoading.set(false)
+      }
+    })
+  }
+
+  removeVoucher() {
+    this.voucherCode.set('')
+    this.voucherResult.set(null)
+    this.voucherError.set('')
   }
 
   closeModal() {
@@ -612,6 +706,7 @@ export class BookingPage {
     this.pax.set(2)
     this.selectedSlotId.set(0)
     this.mutateError.set('')
+    this.removeVoucher()
   }
 
   onDateChange(e: Event) {

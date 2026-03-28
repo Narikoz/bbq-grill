@@ -10,7 +10,7 @@ import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms'
 import { injectQuery, injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental'
 import { ApiService } from '../../core/services/api.service'
 import { AuthService } from '../../core/services/auth.service'
-import { Employee, TodayReport, TimeSlot } from '../../core/models'
+import { Employee, TodayReport, TimeSlot, Voucher } from '../../core/models'
 import { Chart, registerables, TooltipItem } from 'chart.js'
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service'
 
@@ -59,6 +59,14 @@ Chart.register(...registerables)
               <span class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-[10px] font-bold rounded-full"
                     style="min-width:18px;height:18px;padding:0 5px;background:var(--color-crimson);color:white">{{ unreadCount() }}</span>
             }
+          </button>
+          <button (click)="activeTab.set('vouchers')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left"
+                  [style.background]="activeTab() === 'vouchers' ? 'rgba(201,168,76,.10)' : 'transparent'"
+                  [style.border]="activeTab() === 'vouchers' ? '1px solid rgba(201,168,76,.22)' : '1px solid transparent'"
+                  [style.color]="activeTab() === 'vouchers' ? 'var(--color-gold)' : 'var(--color-smoke)'"
+                  style="cursor:pointer">
+            🎫 Voucher
           </button>
           <a routerLink="/staff" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium"
              style="color:var(--color-smoke);text-decoration:none">
@@ -628,6 +636,120 @@ Chart.register(...registerables)
           }
         } <!-- /messages -->
 
+        @if (activeTab() === 'vouchers') {
+          <div class="mb-8 flex items-start justify-between gap-6">
+            <div>
+              <h1 class="num-display text-4xl mb-1" style="color:var(--color-ash)">🎫 Voucher</h1>
+              <p class="text-sm font-mono" style="color:var(--color-smoke)">
+                โค้ดส่วนลด · {{ (vouchersQuery.data()?.vouchers ?? []).length }} โค้ด
+              </p>
+            </div>
+            <button (click)="showCreateVoucher.set(true)"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold"
+                    style="background:rgba(201,168,76,.10);border:1px solid rgba(201,168,76,.25);color:var(--color-gold);cursor:pointer;font-family:var(--font-sans)">
+              + สร้างโค้ด
+            </button>
+          </div>
+
+          @if (voucherFlash()) {
+            <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm mb-4"
+                 [style.background]="voucherFlash()!.ok ? 'rgba(16,185,129,.09)' : 'rgba(239,68,68,.09)'"
+                 [style.border]="'1px solid ' + (voucherFlash()!.ok ? 'rgba(16,185,129,.22)' : 'rgba(239,68,68,.22)')"
+                 [style.color]="voucherFlash()!.ok ? '#86efac' : '#fca5a5'">
+              {{ voucherFlash()!.ok ? '✓' : '✕' }} {{ voucherFlash()!.text }}
+            </div>
+          }
+
+          @if (vouchersQuery.isPending()) {
+            <div class="flex items-center justify-center h-40">
+              <div class="animate-spin rounded-full"
+                   style="width:28px;height:28px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--color-gold)"></div>
+            </div>
+          } @else if ((vouchersQuery.data()?.vouchers ?? []).length === 0) {
+            <div class="flex flex-col items-center justify-center py-20" style="color:var(--color-haze)">
+              <div style="font-size:48px;margin-bottom:12px">🎫</div>
+              <div class="text-sm">ยังไม่มีโค้ดส่วนลด</div>
+            </div>
+          } @else {
+            <div class="rounded-2xl overflow-hidden" style="border:1px solid rgba(255,255,255,.07)">
+              <table class="w-full">
+                <thead>
+                  <tr style="background:rgba(255,255,255,.03)">
+                    @for (h of ['โค้ด', 'ส่วนลด', 'ใช้แล้ว/ทั้งหมด', 'หมดอายุ', 'สถานะ', '']; track h) {
+                      <th class="text-left px-5 py-3 text-[10px] font-bold tracking-widest uppercase"
+                          style="color:var(--color-haze);border-bottom:1px solid rgba(255,255,255,.06)">{{ h }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of vouchersQuery.data()?.vouchers ?? []; track v.voucher_id) {
+                    <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                      <td class="px-5 py-4">
+                        <span class="font-mono font-bold text-sm px-3 py-1 rounded-lg"
+                              style="background:rgba(201,168,76,.10);border:1px solid rgba(201,168,76,.20);color:var(--color-gold);letter-spacing:.1em">
+                          {{ v.code }}
+                        </span>
+                        @if (v.description) {
+                          <div class="text-xs mt-1" style="color:var(--color-haze)">{{ v.description }}</div>
+                        }
+                      </td>
+                      <td class="px-5 py-4">
+                        <span class="font-display text-2xl" style="color:var(--color-jade)">{{ v.discount_pct }}%</span>
+                      </td>
+                      <td class="px-5 py-4">
+                        <div class="flex items-center gap-2">
+                          <div class="h-1.5 rounded-full overflow-hidden" style="width:60px;background:rgba(255,255,255,.08)">
+                            <div class="h-full rounded-full"
+                                 [style.width]="v.max_uses > 0 ? (v.used_count / v.max_uses * 100) + '%' : '0%'"
+                                 style="background:var(--color-gold)"></div>
+                          </div>
+                          <span class="font-mono text-sm" style="color:var(--color-smoke)">
+                            {{ v.used_count }}/{{ v.max_uses === 0 ? '∞' : v.max_uses }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-5 py-4">
+                        @if (v.expires_at) {
+                          <span class="text-xs font-mono" style="color:var(--color-smoke)">
+                            {{ v.expires_at | date:'dd/MM/yy' }}
+                          </span>
+                        } @else {
+                          <span style="color:var(--color-haze)">—</span>
+                        }
+                      </td>
+                      <td class="px-5 py-4">
+                        <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase"
+                              [style.background]="v.is_active ? 'rgba(16,185,129,.10)' : 'rgba(239,68,68,.08)'"
+                              [style.border]="'1px solid ' + (v.is_active ? 'rgba(16,185,129,.22)' : 'rgba(239,68,68,.18)')"
+                              [style.color]="v.is_active ? 'var(--color-jade)' : 'var(--color-crimson)'">
+                          {{ v.is_active ? 'ACTIVE' : 'DISABLED' }}
+                        </span>
+                      </td>
+                      <td class="px-5 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                          <button (click)="toggleVoucherActive(v)"
+                                  class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                                  [style.background]="v.is_active ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.08)'"
+                                  [style.border]="'1px solid ' + (v.is_active ? 'rgba(239,68,68,.20)' : 'rgba(16,185,129,.22)')"
+                                  [style.color]="v.is_active ? 'var(--color-crimson)' : 'var(--color-jade)'"
+                                  style="cursor:pointer">
+                            {{ v.is_active ? '■ ปิด' : '► เปิด' }}
+                          </button>
+                          <button (click)="deleteVoucher(v)"
+                                  class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                                  style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.20);color:var(--color-crimson);cursor:pointer">
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        } <!-- /vouchers -->
+
       </main>
     </div>
 
@@ -823,6 +945,72 @@ Chart.register(...registerables)
       </div>
     }
 
+    <!-- Create Voucher Modal -->
+    @if (showCreateVoucher()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-5"
+           style="background:rgba(5,6,8,.82);backdrop-filter:blur(10px)"
+           (click)="showCreateVoucher.set(false)">
+        <div class="w-full max-w-[460px] rounded-2xl p-8"
+             style="background:linear-gradient(160deg,var(--color-smolder),var(--color-cinder));border:1px solid rgba(201,168,76,.15);box-shadow:0 40px 120px rgba(0,0,0,.70)"
+             (click)="$event.stopPropagation()">
+          <h3 class="font-display text-2xl mb-6" style="color:var(--color-ash);font-weight:300">🎫 สร้างโค้ดส่วนลด</h3>
+          <form [formGroup]="voucherForm" (ngSubmit)="submitCreateVoucher()" class="flex flex-col gap-4">
+            <div>
+              <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                     style="color:var(--color-smoke)">โค้ด (A-Z, 0-9, -, _)</label>
+              <input type="text" formControlName="code"
+                     placeholder="SUMMER20"
+                     (input)="voucherForm.get('code')!.setValue($any($event.target).value.toUpperCase())"
+                     class="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono tracking-widest uppercase"
+                     style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:var(--color-ash)">
+              @if (voucherForm.get('code')?.touched && voucherForm.get('code')?.invalid) {
+                <p class="text-xs mt-1" style="color:var(--color-crimson)">โค้ดต้องเป็น A-Z 0-9 ขีด 3-32 ตัว</p>
+              }
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                       style="color:var(--color-smoke)">ส่วนลด (%)</label>
+                <input type="number" formControlName="discount_pct" min="1" max="100"
+                       class="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono"
+                       style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:var(--color-ash)">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                       style="color:var(--color-smoke)">ใช้ได้กี่ครั้ง (0 = ไม่จำกัด)</label>
+                <input type="number" formControlName="max_uses" min="0"
+                       class="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono"
+                       style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:var(--color-ash)">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                     style="color:var(--color-smoke)">วันหมดอายุ (ว่างไว้ = ไม่มีวันหมดอายุ)</label>
+              <input type="datetime-local" formControlName="expires_at"
+                     class="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono"
+                     style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:var(--color-ash);color-scheme:dark">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold tracking-widest uppercase mb-2"
+                     style="color:var(--color-smoke)">คำอธิบาย (optional)</label>
+              <input type="text" formControlName="description"
+                     placeholder="เช่น โปรโมชั่นฤดูร้อน"
+                     class="w-full px-4 py-3 rounded-xl text-sm outline-none"
+                     style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:var(--color-ash);font-family:var(--font-sans)">
+            </div>
+            <div class="flex gap-2.5 mt-2">
+              <button type="button" (click)="showCreateVoucher.set(false)"
+                      class="flex-1 py-3 rounded-xl text-sm font-semibold"
+                      style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:var(--color-smoke);cursor:pointer">ยกเลิก</button>
+              <button type="submit"
+                      class="flex-1 py-3 rounded-xl text-sm font-semibold"
+                      style="background:linear-gradient(135deg,var(--color-gold-light),var(--color-gold));color:#050608;border:none;cursor:pointer;font-family:var(--font-sans)">สร้างโค้ด</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
+
     <!-- Reset Password Modal -->
     @if (resetTarget()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center p-5"
@@ -872,12 +1060,23 @@ export class AdminPage {
   csvLoading      = signal(false)
   csvFrom         = signal<string>((() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) })())
   csvTo           = signal<string>(new Date().toISOString().slice(0, 10))
-  activeTab       = signal<'dashboard' | 'customers' | 'messages'>('dashboard')
+  activeTab       = signal<'dashboard' | 'customers' | 'messages' | 'vouchers'>('dashboard')
   crmSearch       = signal('')
   hoveredRow      = signal<number | null>(null)
   historyCustomer = signal<any>(null)
   msgFilter       = signal<'all' | 'unread' | 'read' | 'replied'>('all')
   expandedMsgId   = signal<number | null>(null)
+
+  showCreateVoucher = signal(false)
+  voucherFlash      = signal<{ ok: boolean; text: string } | null>(null)
+
+  voucherForm = this.fb.group({
+    code:         ['', [Validators.required, Validators.pattern(/^[A-Z0-9_\-]{3,32}$/)]],
+    discount_pct: [10, [Validators.required, Validators.min(1), Validators.max(100)]],
+    max_uses:     [1,  [Validators.required, Validators.min(0)]],
+    expires_at:   [''],
+    description:  [''],
+  })
   todayStr    = new Date().toLocaleDateString('th-TH', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
 
   crmHeaders = ['#', 'ลูกค้า', 'เบอร์โทร', 'จองทั้งหมด', 'สำเร็จ / ยกเลิก', 'ยอดรวม', 'เฉลี่ย/ครั้ง', 'มาล่าสุด', '']
@@ -1334,6 +1533,67 @@ export class AdminPage {
       CANCELLED: { bg: 'rgba(239,68,68,.12)',   color: 'var(--color-crimson)' },
     }
     return m[s] ?? { bg: 'rgba(148,163,184,.10)', color: 'var(--color-smoke)' }
+  }
+
+  vouchersQuery = injectQuery(() => ({
+    queryKey: ['vouchers'],
+    queryFn: () => new Promise<{ vouchers: Voucher[] }>((res, rej) => {
+      this.api.getVouchers().subscribe({ next: res, error: rej })
+    }),
+    refetchInterval: 30_000,
+  }))
+
+  voucherMutation = injectMutation(() => ({
+    mutationFn: ({ action, id, data }: { action: string; id?: number; data?: Record<string, unknown> }) =>
+      new Promise<unknown>((res, rej) => {
+        if (action === 'create') {
+          this.api.createVoucher(data as any).subscribe({ next: res, error: rej })
+        } else if (action === 'update') {
+          this.api.updateVoucher(id!, data!).subscribe({ next: res, error: rej })
+        } else if (action === 'delete') {
+          this.api.deleteVoucher(id!).subscribe({ next: res, error: rej })
+        }
+      }),
+    onSuccess: (_: unknown, vars: { action: string; id?: number; data?: Record<string, unknown> }) => {
+      this.qc.invalidateQueries({ queryKey: ['vouchers'] })
+      const msg = vars.action === 'create' ? 'สร้างโค้ดสำเร็จ' :
+                  vars.action === 'delete' ? 'ลบโค้ดแล้ว' : 'อัปเดตสำเร็จ'
+      this.voucherFlash.set({ ok: true, text: msg })
+      setTimeout(() => this.voucherFlash.set(null), 3000)
+      this.showCreateVoucher.set(false)
+      this.voucherForm.reset({ discount_pct: 10, max_uses: 1 })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { error?: { error?: string } }).error?.error ?? 'เกิดข้อผิดพลาด'
+      this.voucherFlash.set({ ok: false, text: msg })
+      setTimeout(() => this.voucherFlash.set(null), 4000)
+    },
+  }))
+
+  submitCreateVoucher() {
+    if (this.voucherForm.invalid) return
+    const v = this.voucherForm.value
+    this.voucherMutation.mutate({
+      action: 'create',
+      data: {
+        code:         v.code!.toUpperCase(),
+        discount_pct: v.discount_pct!,
+        max_uses:     v.max_uses!,
+        expires_at:   v.expires_at || '',
+        description:  v.description || '',
+        is_active:    1,
+      }
+    })
+  }
+
+  async deleteVoucher(v: Voucher) {
+    const ok = await this.confirmDialog.confirm('ลบโค้ด', `ต้องการลบโค้ด "${v.code}" ใช่หรือไม่?`, { type: 'danger', confirmText: 'ลบ' })
+    if (!ok) return
+    this.voucherMutation.mutate({ action: 'delete', id: v.voucher_id })
+  }
+
+  toggleVoucherActive(v: Voucher) {
+    this.voucherMutation.mutate({ action: 'update', id: v.voucher_id, data: { is_active: v.is_active ? 0 : 1 } })
   }
 
   exportCustomerCsv() {
