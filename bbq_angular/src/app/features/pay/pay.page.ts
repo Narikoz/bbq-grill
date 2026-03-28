@@ -235,6 +235,7 @@ export class PayPage implements OnInit, OnDestroy {
   subtotal   = signal('0')
   service    = signal('0.00')
   vat        = signal('0.00')
+  discountAmt = signal(0)
   amountSubtitle = signal('ยอดรวมทั้งหมด')
   payMethod  = signal('')
   depositAmt = signal(0)
@@ -247,26 +248,21 @@ export class PayPage implements OnInit, OnDestroy {
   ringOffset = signal(0)
   ringColor  = signal('var(--color-gold)')
 
-  priceChips = () => [
-    `ค่าอาหาร ฿${this.subtotal()}`,
-    `Service ฿${this.service()}`,
-    `VAT ฿${this.vat()}`,
-  ]
+  priceChips = () => {
+    const chips = [
+      `ค่าอาหาร ฿${this.subtotal()}`,
+      `Service ฿${this.service()}`,
+      `VAT ฿${this.vat()}`,
+    ]
+    if (this.discountAmt() > 0) chips.push(`ส่วนลด -฿${this.discountAmt().toFixed(2)}`)
+    return chips
+  }
 
   stepPills = [
     { n: 1, label: 'นั่งโต๊ะ',   done: true,  active: false },
     { n: 2, label: 'สแกนจ่าย', done: false, active: true  },
     { n: 3, label: 'ใบเสร็จ',   done: false, active: false },
   ]
-
-  queueQuery = injectQuery(() => ({
-    queryKey: ['queues-all'],
-    queryFn: () => new Promise<{ queues: Array<Record<string, unknown>> }>((res, rej) => {
-      this.api.getQueues('all', '').subscribe({ next: res, error: rej })
-    }),
-    enabled: this.queueId() > 0,
-    retry: false,
-  }))
 
   payQuery = injectQuery(() => ({
     queryKey: ['pay', this.queueId()],
@@ -283,7 +279,7 @@ export class PayPage implements OnInit, OnDestroy {
       this.api.confirmPayment(this.queueId(), this.token()).subscribe({ next: res, error: rej })
     }),
     onSuccess: () => {
-      this.router.navigate(['/queue-status', this.queueId()])
+      this.router.navigate(['/queue-status', this.queueId()], { queryParams: { token: this.token() } })
     },
     onError: (e: unknown) => {
       this.err.set((e as { error?: { error?: string } }).error?.error ?? 'เกิดข้อผิดพลาด')
@@ -293,39 +289,38 @@ export class PayPage implements OnInit, OnDestroy {
   constructor() {
     effect(() => {
       const data = this.payQuery.data()
-      const qData = this.queueQuery.data()
-      if (data && qData && !this.payData()) {
+      if (data && !this.payData()) {
         this.payData.set(data)
         const pax = data['pax_amount'] as number
-        
-        // Find queue in queues list to get pay_method, deposit_amount, remaining_amount, tier
-        const queue = (qData.queues as Array<Record<string, unknown>>).find(q => q['queue_id'] === this.queueId())
-        const tier = (queue?.['tier'] as string) ?? 'SILVER'
+        const tier = (data['tier'] as string) ?? 'SILVER'
         const b   = calcBreakdown(pax, tier)
-        const payMethod = (queue?.['pay_method'] as string) ?? 'QR_FULL'
-        const depositAmount = (queue?.['deposit_amount'] as number) ?? 0
-        const remainingAmount = (queue?.['remaining_amount'] as number) ?? 0
-        
+        const payMethod = (data['pay_method'] as string) ?? 'QR_FULL'
+        const discountAmt   = (data['discount_amount'] as number) ?? 0
+        const depositAmount = (data['deposit_amount'] as number) ?? 0
+        const remainingAmount = (data['remaining_amount'] as number) ?? 0
+
         this.payMethod.set(payMethod)
         this.depositAmt.set(depositAmount)
         this.remainingAmt.set(remainingAmount)
-        
+
         // Calculate amount to show based on pay_method
         let amountToShow: number
         let subtitle: string
-        
+
         if (payMethod === 'QR_DEPOSIT' || payMethod === 'CASH_DEPOSIT') {
           amountToShow = depositAmount
           subtitle = `ยอดมัดจำ (คงเหลือ ฿${remainingAmount.toFixed(0)} ชำระหน้าร้าน)`
         } else {
-          amountToShow = b.grand
-          subtitle = 'ยอดรวมทั้งหมด'
+          // QR_FULL: use discounted grand total (backend is source of truth)
+          amountToShow = b.grand - discountAmt
+          subtitle = discountAmt > 0 ? `ยอดรวมหลังหักส่วนลด (ลด ฿${discountAmt.toFixed(2)})` : 'ยอดรวมทั้งหมด'
         }
-        
+
         this.grandTotal.set(amountToShow.toFixed(2))
         this.subtotal.set(b.subtotal.toFixed(0))
         this.service.set(b.service.toFixed(2))
         this.vat.set(b.vat.toFixed(2))
+        this.discountAmt.set(discountAmt)
         this.amountSubtitle.set(subtitle)
         
         // BUG-04 fix: use pay_token_expires from API (now included in SQL)

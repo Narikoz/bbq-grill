@@ -40,6 +40,10 @@ export const QueueSchema = z.object({
   time_remaining_sec: z.number().nullable().optional(),
   tier:              z.string().optional(),
   price_per_person:  z.number().optional(),
+  voucher_code:      z.string().nullable().optional(),
+  discount_amount:   z.number().optional(),
+  grand_total_before_discount: z.number().optional(),
+  grand_total_after_discount:  z.number().optional(),
 })
 export type Queue = z.infer<typeof QueueSchema>
 
@@ -67,6 +71,17 @@ export const PaymentSchema = z.object({
   pay_method_label: z.string(),
   payment_time:     z.string(),
   ref:              z.string(),
+  voucher_code:     z.string().nullable().optional(),
+  discount_amount:  z.number().optional(),
+  grand_total_before_discount: z.number().optional(),
+  grand_total_after_discount:  z.number().optional(),
+  calc_subtotal:    z.number().optional(),
+  calc_service:     z.number().optional(),
+  calc_vat:         z.number().optional(),
+  deposit_amount:   z.number().optional(),
+  remaining_amount: z.number().optional(),
+  tier:             z.string().optional(),
+  price_per_person: z.number().optional(),
 })
 export type Payment = z.infer<typeof PaymentSchema>
 

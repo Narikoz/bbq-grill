@@ -147,7 +147,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
                 <!-- Deposit method + paid: show 3 rows -->
                 <div class="flex items-center justify-between py-3 border-b" style="border-color:rgba(255,255,255,.06)">
                   <span class="text-sm" style="color:var(--color-smoke)">ราคารวม</span>
-                  <span class="text-sm font-semibold" style="color:var(--color-ash)">฿{{ calcGrand(q.pax_amount, q.price_per_person).toFixed(2) }}</span>
+                  <span class="text-sm font-semibold" style="color:var(--color-ash)">฿{{ calcGrand(q.pax_amount, q.price_per_person, q.discount_amount ?? 0).toFixed(2) }}</span>
                 </div>
                 <div class="flex items-center justify-between py-3 border-b" style="border-color:rgba(255,255,255,.06)">
                   <span class="text-sm" style="color:var(--color-jade)">หักมัดจำ</span>
@@ -155,14 +155,20 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
                 </div>
                 <div class="flex items-center justify-between py-3 border-b" style="border-color:rgba(255,255,255,.06)">
                   <span class="text-base font-bold" style="color:var(--color-gold)">ยอดคงเหลือ</span>
-                  <span class="text-xl font-bold" style="color:var(--color-gold);font-family:'Kanit',sans-serif">฿{{ calcRemaining(q.pax_amount, q.price_per_person).toFixed(2) }}</span>
+                  <span class="text-xl font-bold" style="color:var(--color-gold);font-family:'Kanit',sans-serif">฿{{ calcRemaining(q.pax_amount, q.price_per_person, q.discount_amount ?? 0).toFixed(2) }}</span>
                 </div>
               } @else {
                 <!-- Full payment or unpaid: show single row -->
+                @if ((q.discount_amount ?? 0) > 0) {
+                  <div class="flex items-center justify-between py-3 border-b" style="border-color:rgba(255,255,255,.06)">
+                    <span class="text-sm" style="color:var(--color-jade)">ส่วนลด{{ q.voucher_code ? ' (' + q.voucher_code + ')' : '' }}</span>
+                    <span class="text-sm font-semibold" style="color:var(--color-jade)">-฿{{ (q.discount_amount ?? 0).toFixed(2) }}</span>
+                  </div>
+                }
                 <div class="flex items-center justify-between py-3 border-b" style="border-color:rgba(255,255,255,.06)">
                   <span class="text-sm" style="color:var(--color-smoke)">ราคารวม</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold" style="color:var(--color-gold)">฿{{ calcGrand(q.pax_amount, q.price_per_person).toFixed(2) }}</span>
+                    <span class="text-sm font-bold" style="color:var(--color-gold)">฿{{ calcGrand(q.pax_amount, q.price_per_person, q.discount_amount ?? 0).toFixed(2) }}</span>
                     @if (q.is_paid) {
                       <span class="text-xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,.15);color:var(--color-jade)">✅ ชำระครบแล้ว</span>
                     }
@@ -252,7 +258,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
                    style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:var(--color-smoke);text-decoration:none">
                   จองใหม่
                 </a>
-                @if (q.queue_status === 'WAITING') {
+                @if (q.queue_status === 'WAITING' && !isPublic()) {
                   <button (click)="showCancelModal.set(true)" class="flex-1 py-3 rounded-xl text-sm font-semibold"
                           style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:var(--color-crimson);cursor:pointer">
                     ยกเลิกการจอง
@@ -300,6 +306,8 @@ export class QueueStatusPage {
   private confirmDialog = inject(ConfirmDialogService)
 
   queueId = computed(() => parseInt(this.route.snapshot.paramMap.get('id') ?? '0'))
+  token   = computed(() => this.route.snapshot.queryParamMap.get('token') ?? '')
+  isPublic = computed(() => this.token() !== '')
   showCancelModal = signal(false)
 
   private pushRequested = false
@@ -311,16 +319,21 @@ export class QueueStatusPage {
   })
 
   queueQuery = injectQuery(() => ({
-    queryKey: ['queue-status', this.queueId()],
+    queryKey: ['queue-status', this.queueId(), this.token()],
     queryFn: () => new Promise<Queue>((res, rej) => {
-      this.api.getQueues('all').subscribe({
-        next: (data: { queues: Queue[] }) => {
-          const q = data.queues.find((q: Queue) => q.queue_id === this.queueId())
-          if (q) res(q)
-          else rej(new Error('Queue not found'))
-        },
-        error: rej
-      })
+      const tok = this.token()
+      if (tok) {
+        this.api.getQueuePublic(this.queueId(), tok).subscribe({ next: res, error: rej })
+      } else {
+        this.api.getQueues('all').subscribe({
+          next: (data: { queues: Queue[] }) => {
+            const q = data.queues.find((q: Queue) => q.queue_id === this.queueId())
+            if (q) res(q)
+            else rej(new Error('Queue not found'))
+          },
+          error: rej
+        })
+      }
     }),
     refetchInterval: 10_000, // Auto-refresh every 10s
   }))
@@ -414,17 +427,20 @@ export class QueueStatusPage {
     })
   }
 
-  calcGrand(pax: number, pricePerPerson?: number): number {
+  calcGrand(pax: number, pricePerPerson?: number, discount = 0): number {
     const pp = pricePerPerson ?? 299
-    return Math.round(pax * pp * 1.10 * 1.07 * 100) / 100
+    const sub = pax * pp
+    const svc = Math.round(sub * 0.10 * 100) / 100
+    const vat = Math.round((sub + svc) * 0.07 * 100) / 100
+    return Math.round((sub + svc + vat - discount) * 100) / 100
   }
 
   calcDeposit(pax: number): number {
     return pax * 100
   }
 
-  calcRemaining(pax: number, pricePerPerson?: number): number {
-    return Math.round((this.calcGrand(pax, pricePerPerson) - this.calcDeposit(pax)) * 100) / 100
+  calcRemaining(pax: number, pricePerPerson?: number, discount = 0): number {
+    return Math.round((this.calcGrand(pax, pricePerPerson, discount) - this.calcDeposit(pax)) * 100) / 100
   }
 
   isDepositMethod(pm: string): boolean {

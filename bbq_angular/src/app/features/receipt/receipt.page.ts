@@ -161,16 +161,22 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
               <div class="px-6 py-3" style="border-bottom:1px solid rgba(255,255,255,.05)">
                 <div class="flex justify-between py-1.5 text-sm" style="color:var(--color-smoke)">
                   <span>ค่าอาหาร ({{ p.pax_amount }} × ฿{{ getPricePerPerson(p) }} {{ getTierName(p) }})</span>
-                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcSubtotal(p.pax_amount) | number:'1.2-2' }}</span>
+                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcSubtotal(p) | number:'1.2-2' }}</span>
                 </div>
                 <div class="flex justify-between py-1.5 text-sm" style="color:var(--color-smoke)">
                   <span>ค่าบริการ (10%)</span>
-                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcService(p.pax_amount) | number:'1.2-2' }}</span>
+                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcService(p) | number:'1.2-2' }}</span>
                 </div>
                 <div class="flex justify-between py-1.5 text-sm" style="color:var(--color-smoke)">
                   <span>VAT (7%)</span>
-                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcVat(p.pax_amount) | number:'1.2-2' }}</span>
+                  <span class="font-mono font-semibold" style="color:var(--color-ash)">฿{{ calcVat(p) | number:'1.2-2' }}</span>
                 </div>
+                @if (getDiscount(p) > 0) {
+                  <div class="flex justify-between py-1.5 text-sm">
+                    <span style="color:var(--color-jade)">ส่วนลด {{ getDiscountPct(p) > 0 ? getDiscountPct(p) + '%' : '' }}{{ getVoucherCode(p) ? ' (' + getVoucherCode(p) + ')' : '' }}</span>
+                    <span class="font-mono font-semibold" style="color:var(--color-jade)">-฿{{ getDiscount(p) | number:'1.2-2' }}</span>
+                  </div>
+                }
               </div>
 
               <!-- Grand total or deposit breakdown -->
@@ -178,8 +184,8 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
                 <!-- Deposit breakdown -->
                 <div class="mx-5 my-4">
                   <div class="flex justify-between items-center px-4 py-2 text-sm" style="color:var(--color-smoke)">
-                    <span>ยอดรวม</span>
-                    <span class="font-mono font-semibold">฿{{ calcGrand(p.pax_amount) | number:'1.2-2' }}</span>
+                    <span>ยอดรวมสุทธิ</span>
+                    <span class="font-mono font-semibold">฿{{ calcGrand(p) | number:'1.2-2' }}</span>
                   </div>
                   <div class="flex justify-between items-center px-4 py-2 text-sm" style="color:var(--color-jade)">
                     <span>มัดจำที่ชำระแล้ว</span>
@@ -188,7 +194,7 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
                   <div class="flex items-center justify-between px-5 py-4 rounded-xl"
                        style="background:linear-gradient(135deg,rgba(201,168,76,.10),rgba(201,168,76,.04));border:1px solid rgba(201,168,76,.20)">
                     <span class="font-semibold" style="color:var(--color-gold)">ยอดที่ชำระหน้าร้าน</span>
-                    <span class="num-display text-3xl" style="color:var(--color-ash)">฿{{ remainingAmount(p.pax_amount) | number:'1.2-2' }}</span>
+                    <span class="num-display text-3xl" style="color:var(--color-ash)">฿{{ remainingAmount(p) | number:'1.2-2' }}</span>
                   </div>
                 </div>
               } @else {
@@ -196,7 +202,7 @@ import { Payment, payLabel, tierPrice, TIER_LABELS, TierType } from '../../core/
                 <div class="mx-5 my-4 flex items-center justify-between px-5 py-4 rounded-xl grand-zone"
                      style="background:linear-gradient(135deg,rgba(201,168,76,.10),rgba(201,168,76,.04));border:1px solid rgba(201,168,76,.20)">
                   <span class="font-semibold" style="color:var(--color-gold)">ยอดรวมสุทธิ</span>
-                  <span class="num-display text-3xl" style="color:var(--color-ash)">฿{{ calcGrand(p.pax_amount) | number:'1.2-2' }}</span>
+                  <span class="num-display text-3xl" style="color:var(--color-ash)">฿{{ calcGrand(p) | number:'1.2-2' }}</span>
                 </div>
               }
 
@@ -309,23 +315,30 @@ export class ReceiptPage {
     return TIER_LABELS[tier]?.name ?? 'Standard'
   }
 
-  calcSubtotal(pax: number): number {
-    return pax * this.getReceiptPP()
+  getDiscount(p: Payment): number  { return (p as any).discount_amount ?? 0 }
+  getDiscountPct(p: Payment): number { return (p as any).discount_pct ?? 0 }
+  getVoucherCode(p: Payment): string | null { return (p as any).voucher_code ?? null }
+
+  calcSubtotal(p: Payment): number {
+    return (p as any).calc_subtotal ?? (p.pax_amount * this.getReceiptPP())
   }
 
-  calcService(pax: number): number {
-    const subtotal = this.calcSubtotal(pax)
-    return Math.round(subtotal * 0.10 * 100) / 100
+  calcService(p: Payment): number {
+    if ((p as any).calc_service != null) return (p as any).calc_service
+    const sub = this.calcSubtotal(p)
+    return Math.round(sub * 0.10 * 100) / 100
   }
 
-  calcVat(pax: number): number {
-    const subtotal = this.calcSubtotal(pax)
-    const service = this.calcService(pax)
-    return Math.round((subtotal + service) * 0.07 * 100) / 100
+  calcVat(p: Payment): number {
+    if ((p as any).calc_vat != null) return (p as any).calc_vat
+    const sub = this.calcSubtotal(p)
+    const svc = this.calcService(p)
+    return Math.round((sub + svc) * 0.07 * 100) / 100
   }
 
-  calcGrand(pax: number): number {
-    return this.calcSubtotal(pax) + this.calcService(pax) + this.calcVat(pax)
+  calcGrand(p: Payment): number {
+    const before = this.calcSubtotal(p) + this.calcService(p) + this.calcVat(p)
+    return Math.round((before - this.getDiscount(p)) * 100) / 100
   }
 
   // Check if there's a deposit payment
@@ -342,9 +355,9 @@ export class ReceiptPage {
       .reduce((sum: number, p: any) => sum + parseFloat(p.total_amount || 0), 0)
   }
 
-  // Calculate remaining amount after deposit
-  remainingAmount(pax: number): number {
-    return this.calcGrand(pax) - this.depositAmount()
+  // Calculate remaining amount after deposit (uses discounted grand)
+  remainingAmount(p: Payment): number {
+    return Math.round((this.calcGrand(p) - this.depositAmount()) * 100) / 100
   }
 
   customerRows(p: Payment) {

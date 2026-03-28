@@ -311,7 +311,7 @@ import { z } from 'zod'
                             [style.color]="qrType() === 'QR_FULL' ? 'var(--color-gold)' : 'var(--color-ash)'"
                             style="font-family:var(--font-sans)">จ่ายเต็มจำนวน</span>
                     </div>
-                    <div class="font-mono text-base font-bold" style="color:var(--color-gold)">฿{{ breakdown().grand.toFixed(0) }}</div>
+                    <div class="font-mono text-base font-bold" style="color:var(--color-gold)">฿{{ grandAfterDiscount().toFixed(0) }}</div>
                     <div class="text-[10px] leading-snug" style="color:var(--color-haze);font-family:var(--font-sans)">ชำระครบทันที ไม่ต้องจ่ายเพิ่ม</div>
                   </div>
                   <div (click)="qrType.set('QR_DEPOSIT')"
@@ -325,7 +325,7 @@ import { z } from 'zod'
                             style="font-family:var(--font-sans)">จ่ายมัดจำ</span>
                     </div>
                     <div class="font-mono text-base font-bold" style="color:var(--color-gold)">฿{{ depositAmount() }}</div>
-                    <div class="text-[10px] leading-snug" style="color:var(--color-haze);font-family:var(--font-sans)">จ่ายมัดจำ {{ pax() }}×฿100 ตอนนี้<br>คงเหลือ ฿{{ (breakdown().grand - depositAmount()).toFixed(0) }} จ่ายหน้าร้าน</div>
+                    <div class="text-[10px] leading-snug" style="color:var(--color-haze);font-family:var(--font-sans)">จ่ายมัดจำ {{ pax() }}×฿100 ตอนนี้<br>คงเหลือ ฿{{ (grandAfterDiscount() - depositAmount()).toFixed(0) }} จ่ายหน้าร้าน</div>
                   </div>
                 </div>
               </div>

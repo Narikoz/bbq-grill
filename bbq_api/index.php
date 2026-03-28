@@ -646,7 +646,7 @@ if ($p = match_route('POST', '/payments/confirm', $path, $method)) {
 
     $conn->begin_transaction();
     try {
-        $stmt = $conn->prepare("SELECT queue_status, pay_token, pay_token_expires, pax_amount, pay_method, tier FROM queues WHERE queue_id=? FOR UPDATE");
+        $stmt = $conn->prepare("SELECT queue_status, pay_token, pay_token_expires, pax_amount, pay_method, tier, discount_amount FROM queues WHERE queue_id=? FOR UPDATE");
         $stmt->bind_param("i", $queue_id); $stmt->execute();
         $q = $stmt->get_result()->fetch_assoc(); $stmt->close();
 
@@ -671,24 +671,25 @@ if ($p = match_route('POST', '/payments/confirm', $path, $method)) {
             json_out(['ok' => true, 'already_paid' => true]);
         }
 
-        $pax      = (int)$q['pax_amount'];
-        $pay_m    = $q['pay_method'] ?? 'QR_FULL';
-        $tier_c   = $q['tier'] ?? 'SILVER';
-        $pp_c     = tier_price($tier_c);
-        $subtotal = $pax * $pp_c;
-        $service  = round($subtotal * 0.10, 2);
-        $vat      = round(($subtotal + $service) * 0.07, 2);
-        $grand    = $subtotal + $service + $vat;
-        $deposit  = $pax * 100;
+        $pax       = (int)$q['pax_amount'];
+        $pay_m     = $q['pay_method'] ?? 'QR_FULL';
+        $tier_c    = $q['tier'] ?? 'SILVER';
+        $pp_c      = tier_price($tier_c);
+        $subtotal  = $pax * $pp_c;
+        $service   = round($subtotal * 0.10, 2);
+        $vat       = round(($subtotal + $service) * 0.07, 2);
+        $grand     = $subtotal + $service + $vat;
+        $disc_c    = (float)($q['discount_amount'] ?? 0);
+        $grand_final = round($grand - $disc_c, 2);  // discounted grand total
+        $deposit   = $pax * 100;
 
         // Deposit methods: CASH_DEPOSIT, QR_DEPOSIT → record only deposit amount
         $is_deposit = in_array($pay_m, ['CASH_DEPOSIT','QR_DEPOSIT'], true) ? 1 : 0;
-        $amount   = $is_deposit ? $deposit : $grand;
-        // For deposit, set subtotal/service/vat to deposit (simplified)
+        // For QR_FULL: use discounted grand; for deposit: keep pax×100 exactly
         if ($is_deposit) {
             $rec_subtotal = $deposit; $rec_service = 0; $rec_vat = 0; $rec_total = $deposit;
         } else {
-            $rec_subtotal = $subtotal; $rec_service = $service; $rec_vat = $vat; $rec_total = $grand;
+            $rec_subtotal = $subtotal; $rec_service = $service; $rec_vat = $vat; $rec_total = $grand_final;
         }
         $pm = 'PROMPTPAY';
 
@@ -714,6 +715,7 @@ if ($p = match_route('GET', '/payments/{queue_id}', $path, $method)) {
 
     $stmt = $conn->prepare("
         SELECT q.queue_id, q.pax_amount, q.tier, q.pay_method, q.booking_time, q.queue_status, q.pay_token, q.pay_token_expires,
+               q.voucher_code, q.discount_amount,
                c.customer_name, c.customer_tel,
                t.table_number
         FROM queues q
@@ -766,9 +768,19 @@ if ($p = match_route('GET', '/payments/{queue_id}', $path, $method)) {
     $svc_d   = round($sub_d * 0.10, 2);
     $vat_d   = round(($sub_d + $svc_d) * 0.07, 2);
     $grand_d = $sub_d + $svc_d + $vat_d;
+    $disc_d  = (float)($d['discount_amount'] ?? 0);
+    $grand_after  = round($grand_d - $disc_d, 2);
     $dep_d   = $pax_d * 100;
+    $d['discount_amount']          = $disc_d;
+    $d['voucher_code']             = $d['voucher_code'] ?? null;
+    $d['grand_total_before_discount'] = round($grand_d, 2);
+    $d['grand_total_after_discount']  = $grand_after;
     $d['deposit_amount']   = $dep_d;
-    $d['remaining_amount'] = round($grand_d - $dep_d, 2);
+    $d['remaining_amount'] = round($grand_after - $dep_d, 2);
+    // Also expose per-line breakdown for receipt display
+    $d['calc_subtotal'] = round($sub_d, 2);
+    $d['calc_service']  = round($svc_d, 2);
+    $d['calc_vat']      = round($vat_d, 2);
 
     json_out($d);
 }
@@ -811,6 +823,7 @@ if ($p = match_route('GET', '/queue-public/{queue_id}', $path, $method)) {
         SELECT q.queue_id, q.pax_amount, q.tier, q.pay_method, q.booking_time,
                q.queue_status, q.pay_token, q.pay_token_expires,
                q.created_at, q.seated_at, q.table_id,
+               q.voucher_code, q.discount_amount,
                c.customer_name, c.customer_tel,
                t.table_number,
                p.payment_id, p.payment_method AS paid_method, p.payment_time
@@ -832,19 +845,25 @@ if ($p = match_route('GET', '/queue-public/{queue_id}', $path, $method)) {
         json_out(['error' => 'Token ไม่ถูกต้อง'], 403);
     }
 
-    $pax_q   = (int)$d['pax_amount'];
-    $tier_q  = $d['tier'] ?? 'SILVER';
-    $pp_q    = tier_price($tier_q);
-    $sub_q   = $pax_q * $pp_q;
-    $svc_q   = round($sub_q * 0.10, 2);
-    $vat_q   = round(($sub_q + $svc_q) * 0.07, 2);
-    $grand_q = $sub_q + $svc_q + $vat_q;
-    $dep_q   = $pax_q * 100;
+    $pax_q        = (int)$d['pax_amount'];
+    $tier_q       = $d['tier'] ?? 'SILVER';
+    $pp_q         = tier_price($tier_q);
+    $sub_q        = $pax_q * $pp_q;
+    $svc_q        = round($sub_q * 0.10, 2);
+    $vat_q        = round(($sub_q + $svc_q) * 0.07, 2);
+    $grand_q      = $sub_q + $svc_q + $vat_q;
+    $disc_q       = (float)($d['discount_amount'] ?? 0);
+    $grand_after_q = round($grand_q - $disc_q, 2);
+    $dep_q        = $pax_q * 100;
 
     $d['queue_id_str']     = qid($qid_int);
     $d['price_per_person'] = $pp_q;
+    $d['discount_amount']  = $disc_q;
+    $d['voucher_code']     = $d['voucher_code'] ?? null;
+    $d['grand_total_before_discount'] = round($grand_q, 2);
+    $d['grand_total_after_discount']  = $grand_after_q;
     $d['deposit_amount']   = $dep_q;
-    $d['remaining_amount'] = round($grand_q - $dep_q, 2);
+    $d['remaining_amount'] = round($grand_after_q - $dep_q, 2);
     $d['is_paid']          = !empty($d['payment_id']);
     $d['is_qr']            = !empty($d['pay_token']);
     $d['created_at']       = $d['created_at'] ?? $d['booking_time'];
