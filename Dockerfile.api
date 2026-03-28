@@ -3,14 +3,19 @@ FROM php:8.2-apache
 # Extensions
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Ensure only mpm_prefork is loaded (fixes AH00534: More than one MPM loaded)
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true && \
-    a2enmod mpm_prefork
+# Fix AH00534: remove ALL mpm_* symlinks, then hard-link only mpm_prefork.
+# Using direct symlink manipulation avoids any Apache config-check during build.
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
+          /etc/apache2/mods-enabled/mpm_*.conf && \
+    ln -sf /etc/apache2/mods-available/mpm_prefork.load \
+           /etc/apache2/mods-enabled/mpm_prefork.load && \
+    ln -sf /etc/apache2/mods-available/mpm_prefork.conf \
+           /etc/apache2/mods-enabled/mpm_prefork.conf
 
-# Enable modules
+# Enable rewrite and headers (no MPM side-effects)
 RUN a2enmod rewrite headers
 
-# Apache config
+# Apache global config — allow .htaccess overrides
 RUN sed -i 's|<Directory /var/www/>|<Directory /var/www/html/>|g' \
         /etc/apache2/apache2.conf && \
     sed -i 's/AllowOverride None/AllowOverride All/g' \
@@ -27,15 +32,7 @@ RUN echo "upload_max_filesize = 20M"    >> /usr/local/etc/php/conf.d/app.ini && 
 # Copy API source
 COPY bbq_api/ /var/www/html/api/
 
-# Apache VirtualHost config
-RUN echo '<VirtualHost *:80>\n\
-    DocumentRoot /var/www/html\n\
-    Alias /api /var/www/html/api\n\
-    <Directory /var/www/html/api>\n\
-        Options Indexes FollowSymLinks\n\
-        AllowOverride All\n\
-        Require all granted\n\
-    </Directory>\n\
-</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+# Copy dedicated VirtualHost config (replaces inline echo)
+COPY docker/apache/api-vhost.conf /etc/apache2/sites-available/000-default.conf
 
 EXPOSE 80
