@@ -19,7 +19,7 @@ import { AuthService } from '../../core/services/auth.service'
 
         <!-- Brand -->
         <div class="text-center mb-10 animate-thermal-in">
-          <div class="mb-3 animate-glow-gold" style="font-size:3.5rem;line-height:1"><span class="css-flame"></span></div>
+          <div class="mb-3 animate-glow-gold" style="font-size:3.5rem;line-height:1;display:inline-block"><span class="css-flame"></span></div>
           <div class="font-display text-4xl tracking-widest mb-1" style="color:var(--color-ash)">BBQ GRILL</div>
           <div class="text-xs tracking-[.2em] uppercase" style="color:var(--color-haze)">Staff Portal</div>
         </div>
